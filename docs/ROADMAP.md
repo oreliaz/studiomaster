@@ -24,7 +24,8 @@
 
 - [ ] מודל `StudioProfile` + עורך פרופילים ב-UI.
 - [ ] Studio Launcher: הפעלת תוכנות (`spawn`) + `waitFor` (window/port/process).
-- [ ] Lighting Adapters: interface + מימוש OSC ו-Art-Net (מתחילים בשניים הנפוצים).
+- [ ] Lighting Adapters: interface `LightingAdapter` + מימוש **FreeStyler** (HTTP ל-webserver
+      פורט 3332, עם MIDI כחלופה). אימות פורמט פקודת button/cue מול הוויקי הרשמי.
 - [ ] Onboarding State Machine: `IDLE→LAUNCHING→CONNECTING_OBS→LIGHTING→CHECKLIST→AUDIO_CHECK→READY`.
 - [ ] UI אשף מודרך: צעד-אחר-צעד, בדיקות אוטומטיות + אישורים ידניים.
 

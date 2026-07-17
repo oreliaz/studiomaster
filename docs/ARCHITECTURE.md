@@ -139,10 +139,12 @@ OBS, ה-Launcher, הענן, וה-AI workers.
     { "name": "OBS", "path": "C:/.../obs64.exe", "waitFor": "websocket", "required": true },
     { "name": "Lighting Control", "path": "C:/.../QLC.exe", "waitFor": "window:QLC+" }
   ],
-  "lighting": {                     // בקרת תאורה
-    "protocol": "artnet",           // artnet | sacn | osc | serial | dmx-usb
-    "host": "192.168.1.50",
-    "scenes": { "record": "cue-1", "standby": "cue-0" }
+  "lighting": {                     // בקרת תאורה — FreeStyler
+    "adapter": "freestyler",        // freestyler | artnet | sacn | osc | dmx-usb
+    "transport": "http",            // http (webserver :3332) | midi
+    "host": "127.0.0.1",
+    "port": 3332,
+    "cues": { "record": "button:12", "standby": "button:1" }
   },
   "obs": {
     "sceneCollection": "StudioA",
@@ -166,9 +168,12 @@ GUIDED_CHECKLIST → AUDIO_LEVEL_CHECK → READY → (המשתמש מאשר) →
 
 - **הפעלת תוכנות**: `child_process.spawn` ב-Windows, המתנה עד שהתוכנה מוכנה
   (`waitFor`: קיום חלון / זמינות port / process handle).
-- **בקרת תאורה**: שכבת אדפטרים (Adapter pattern) — כל פרוטוקול מאחורי אותו interface
-  `LightingAdapter.setScene(name)`. תמיכה ב-Art-Net/sACN (רשת), OSC (תוכנות כמו QLC+),
-  ו-DMX-USB (serial). מתחילים ב-OSC + Art-Net (הכי נפוצים).
+- **בקרת תאורה**: שכבת אדפטרים (Adapter pattern) — כל מנגנון מאחורי אותו interface
+  `LightingAdapter.setCue(name)`. **המימוש הראשון: FreeStyler** (התאורה באולפן). FreeStyler
+  חושף webserver/TCP מובנה על **פורט 3332** לשליטה חיצונית, וכן שליטת **MIDI** (דרך virtual
+  MIDI כמו LoopBe1/MIDI Yoke). ה-`FreeStylerAdapter` מפעיל cues/buttons דרך HTTP ל-:3332
+  (ראשי) עם MIDI כחלופה. פורמט הפקודה המדויק (button/sequence) יאומת מול הוויקי הרשמי
+  ב-Phase 1. אדפטרים נוספים (Art-Net/sACN/OSC/DMX-USB) יתווספו לפי צורך מאחורי אותו interface.
 - **הדרכה מודרכת**: כל שלב מוצג ב-UI עם הסבר, בדיקה אוטומטית היכן שאפשר (למשל אימות
   שערוץ המיקרופון קיים ב-OBS ולא mute), ואישור ידני היכן שצריך עין אנושית.
 

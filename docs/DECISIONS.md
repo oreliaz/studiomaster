@@ -18,13 +18,17 @@
 Electron בגלל ecosystem של Node (obs-websocket-js, googleapis, שליטת תהליכי Windows)
 ומהירות פיתוח; Python ל-workers של AI (ffmpeg, whisper). Claude ל-החלטות תוכן/EDL.
 
+### ADR-005: תאורה — FreeStyler DMX, האדפטר הראשון
+התאורה באולפן מופעלת ע"י **FreeStyler**. שליטה חיצונית: webserver/TCP מובנה על **פורט
+3332** (ראשי) ו/או **MIDI** דרך virtual MIDI (LoopBe1/MIDI Yoke). מממשים `FreeStylerAdapter`
+מאחורי ה-interface הכללי `LightingAdapter`; אדפטרים אחרים (Art-Net/OSC/DMX-USB) יתווספו
+בעתיד ללא שינוי בשאר המערכת. פורמט פקודת ה-button/cue המדויק יאומת מול הוויקי הרשמי ב-Phase 1.
+
 ---
 
 ## החלטות פתוחות — צריך קלט ממך
 
-### OD-1: פרוטוקול/דגם התאורה באולפן
-מה מפעיל את התאורה שלך? (Art-Net/sACN ברשת? OSC כמו QLC+? DMX-USB כמו Enttec?
-תוכנה ספציפית?) — קובע איזה Adapter לממש ראשון ב-Phase 1.
+### ~~OD-1: פרוטוקול/דגם התאורה~~ → נסגר, ראה ADR-005
 
 ### OD-2: אילו תוכנות נוספות לפתוח בתחילת אולפן
 רשימת ה-.exe והסדר (מעבר ל-OBS): בקרת תאורה, מיקסר, teleprompter, וכו'.
