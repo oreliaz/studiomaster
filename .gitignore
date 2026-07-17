@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# electron
+release/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+*.pem
+
+# local data
+*.sqlite
+*.sqlite3
+data/
+recordings/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# logs / os
+*.log
+.DS_Store
+Thumbs.db
