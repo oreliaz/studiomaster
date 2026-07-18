@@ -95,6 +95,7 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 | 1 | פתיחת תוכנות + אשף הפעלה | **Studio Launcher** + **Onboarding Wizard** | פרופילי אולפן (JSON), הפעלת תהליכים, בקרת תאורה, checklist מודרך |
 | 2 | הקלטה + ניתוב + ערוצים נפרדים | **Recording Controller** | obs-websocket: multi-track audio, source-record per camera, בקרת עוצמות |
 | 2+ | שליטת מצלמות PTZ מהממשק | **PTZ Camera Control** | VISCA-over-IP (:52381) ל-Minrray/OBSBOT, או גשר ל-obs-ptz; pan/tilt/zoom + presets |
+| 2++ | Hotkey לסימון תיקונים + חיווי ב-OBS | **Review Markers** | globalShortcut → מסמך טיימקודים + `SetSceneItemEnabled` לחיווי ויזואלי ב-OBS |
 | 3 | העלאה + Drive + Calendar + זיהוי | **Cloud Sync** + **Session Recognizer** | googleapis, התאמת session ל-Calendar event, מטא-דאטה |
 | 4 | סוכני עריכה אוטונומיים | **AI Editing Agents** | תור עבודות → Python workers → ffmpeg/whisper/Claude → EDL → render |
 
@@ -243,6 +244,40 @@ meters מ-§6.2) — pan/preset אוטומטי למי שמדבר.
 **מיפוי ל-timeline:** תזוזות/פריסטים נרשמים כ-`TimelineEvent` (kind=`camera`) — קלט
 נוסף לסוכני העריכה (למשל לבחור אוטומטית את הזווית הנכונה ב-multi-cam edit).
 
+### 6.2.2 Review Markers & Timecode Notes — סימון תיקונים בזמן אמת (Hotkey)
+
+**מטרה:** תוך כדי הקלטה, לחיצה על **hot key** מפילה סמן טיימקוד שנכנס ל**מסמך תיקונים**
+(לתיקונים ולמעבר על הפרק), ובו-זמנית **מופיע חיווי ויזואלי על מסך ה-OBS** שמאשר שהסימון
+נקלט. כך אפשר לסמן "כאן צריך תיקון / חתוך / רגע חזק" בלי לעצור, ולעבור על הפרק לפי
+הסימונים בעריכה.
+
+**איך זה עובד:**
+- **Global Hotkey** — Electron `globalShortcut` רושם קיצור מערכת-כללי שעובד גם כשה-focus
+  על OBS או כשהאפליקציה ברקע. ניתן להגדיר כמה קיצורים לפי **קטגוריה** (תיקון / הדגשה /
+  פרק / הערה כללית).
+- **טיימקוד מדויק** — נלקח מ-OBS עצמו דרך obs-websocket (`GetRecordStatus.outputTimecode`),
+  כך שהסמן תואם בדיוק את קובץ ההקלטה, לא רק לשעון המערכת.
+- **מסמך התיקונים** — כל לחיצה מוסיפה שורה ל-`review.md`/`review.csv` per-session **וגם**
+  נשמרת כ-`TimelineEvent(kind=marker)` ב-SQLite. אופציונלי: חלון-קלט קטן always-on-top
+  להוספת הערת טקסט מהירה לסמן.
+- **חיווי ויזואלי ב-OBS** — בלחיצה, StudioMaster מציג לרגע מקור ב-OBS (Text/Image overlay
+  כמו "✓ תיקון נרשם" או מונה סמנים) ע"י `SetSceneItemEnabled(true)` ואז כיבוי אחרי ~1ש',
+  או הפעלת פילטר הבזק. משוב מיידי שהסימון נקלט. הכל דרך obs-websocket — ללא נגיעה בליבת OBS.
+
+**דוגמת שורה במסמך התיקונים:**
+
+```
+| # | timecode   | category | note                        |
+|---|------------|----------|-----------------------------|
+| 1 | 00:03:12.4 | תיקון    | מארח טעה בשם האורח           |
+| 2 | 00:11:47.9 | הדגשה    | רגע חזק — מועמד ל-highlight  |
+| 3 | 00:19:02.1 | פרק      | תחילת נושא 2                 |
+```
+
+**ערך לסוכני העריכה (דרישה 4):** מסמך התיקונים הוא קלט ישיר ל-EDL — הסוכן יודע בדיוק
+אילו קטעים לחתוך (תיקונים), מאילו רגעים להפיק highlights/shorts, והיכן גבולות הפרקים —
+בלי לנחש. זה משדרג דרמטית את איכות העריכה האוטונומית.
+
 ### 6.3 Cloud Sync + Session Recognizer (דרישה 3)
 
 - **Google Calendar**: בתחילת session, StudioMaster שולף אירועי היום מהיומן, ומתאים את
@@ -297,8 +332,9 @@ Camera             (id, label, brand[minrray|obsbot], control[visca-ip|obs-ptz-b
                     host, port, presets{name:index})
 Session            (id, profileId, calendarEventId?, title, guests[],
                     startedAt, endedAt, status, storagePath)
-MediaAsset         (id, sessionId, type[mix|cam|track|transcript|deliverable],
+MediaAsset         (id, sessionId, type[mix|cam|track|transcript|review-doc|deliverable],
                     path, driveFileId?, durationMs, meta)
+ReviewMarker       (id, sessionId, tcMs, category[fix|highlight|chapter|note], note?, createdAt)
 Timeline Event     (id, sessionId, tMs, kind[scene|speaker|record|marker|camera], data)
 EditJob            (id, sessionId, stage, status, workerId, attempts, result)
 DeliverableTemplate(id, name, items[], style)

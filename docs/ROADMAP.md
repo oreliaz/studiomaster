@@ -42,6 +42,9 @@
 - [ ] ניהול קבצי פלט: מבנה תיקיות עקבי per-session.
 - [ ] **PTZ Camera Control**: `PtzController` + `ViscaIpBackend` (UDP :52381) ל-Minrray/OBSBOT;
       לוח PTZ ב-UI (joystick pan/tilt, zoom, presets, בורר מצלמה). גשר `obs-ptz` כחלופה.
+- [ ] **Review Markers (Hotkey)**: `globalShortcut` לפי קטגוריה → מסמך טיימקודים
+      (`review.md`/`csv`) + `ReviewMarker` ב-SQLite, עם טיימקוד מ-`GetRecordStatus`;
+      חיווי ויזואלי ב-OBS (`SetSceneItemEnabled` overlay) בכל לחיצה.
 
 **Deliverable:** הקלטה שמפיקה קבצי שמע נפרדים + קובץ-לכל-מצלמה + תמהיל + timeline,
 עם שליטת PTZ מלאה מהממשק.
@@ -64,7 +67,8 @@
 - [ ] `services/ai-workers` (Python): תור job עמיד + runner.
 - [ ] Transcribe: faster-whisper + diarization.
 - [ ] Analyze: שתיקות, highlights, chapters.
-- [ ] Plan: Claude → EDL מובנה מתוך "Deliverable Template".
+- [ ] Plan: Claude → EDL מובנה מתוך "Deliverable Template" + **מסמך התיקונים** (ReviewMarkers)
+      כקלט ישיר לחיתוכים/highlights/גבולות פרקים.
 - [ ] Render: ffmpeg מבצע EDL (חיתוך, מיזוג שמע, כתוביות, 9:16).
 - [ ] QA gate + אישור אנושי לפני פרסום.
 - [ ] Deliver: העלאה ל-Drive; אופציונלית תזמון סושיאל (MCP OneUp/Nuelink).
