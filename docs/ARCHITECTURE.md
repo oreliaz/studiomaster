@@ -94,6 +94,7 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 |---|-------|------------|--------|
 | 1 | פתיחת תוכנות + אשף הפעלה | **Studio Launcher** + **Onboarding Wizard** | פרופילי אולפן (JSON), הפעלת תהליכים, בקרת תאורה, checklist מודרך |
 | 2 | הקלטה + ניתוב + ערוצים נפרדים | **Recording Controller** | obs-websocket: multi-track audio, source-record per camera, בקרת עוצמות |
+| 2+ | שליטת מצלמות PTZ מהממשק | **PTZ Camera Control** | VISCA-over-IP (:52381) ל-Minrray/OBSBOT, או גשר ל-obs-ptz; pan/tilt/zoom + presets |
 | 3 | העלאה + Drive + Calendar + זיהוי | **Cloud Sync** + **Session Recognizer** | googleapis, התאמת session ל-Calendar event, מטא-דאטה |
 | 4 | סוכני עריכה אוטונומיים | **AI Editing Agents** | תור עבודות → Python workers → ffmpeg/whisper/Claude → EDL → render |
 
@@ -111,6 +112,7 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 | UI | **React + Vite + Tailwind** | אשף, dashboard, mixer view |
 | Orchestrator | **Node.js (Main process)** | state machine, ניהול תת-מערכות |
 | OBS control | **obs-websocket-js v5** | client רשמי לפרוטוקול 5.x |
+| PTZ control | **VISCA-over-IP** (UDP :52381) native, או גשר ל-obs-ptz | Minrray + OBSBOT Tail Air |
 | מצב מקומי | **SQLite (better-sqlite3)** | sessions, jobs, prefs — ללא שרת |
 | תור עבודות | **תור מבוסס-SQLite** (או BullMQ אם נדרש Redis) | פשטות, ללא תלות חיצונית ל-MVP |
 | Google | **googleapis (Node)** + OAuth2 (loopback) | Drive + Calendar רשמי |
@@ -151,6 +153,19 @@ OBS, ה-Launcher, הענן, וה-AI workers.
     "startScene": "Standby",
     "audioTracks": { "1": "mix", "2": "host-mic", "3": "guest-mic", "4": "system" }
   },
+  "cameras": [                      // מצלמות PTZ over IP (Minrray / OBSBOT)
+    {
+      "id": "cam-host", "label": "מארח", "brand": "obsbot",
+      "control": "visca-ip",       // visca-ip | obs-ptz-bridge | onvif
+      "host": "192.168.1.71", "port": 52381,
+      "presets": { "wide": 1, "closeup": 2, "two-shot": 3 }
+    },
+    {
+      "id": "cam-guest", "label": "אורח", "brand": "minrray",
+      "control": "visca-ip", "host": "192.168.1.72", "port": 52381,
+      "presets": { "wide": 1, "closeup": 2 }
+    }
+  ],
   "checklist": [                    // צעדי אשף מודרכים
     "ודא שהמצלמות דולקות",
     "בדוק סימון עוצמה על מיקרופון מארח (-12dB)",
@@ -193,6 +208,40 @@ GUIDED_CHECKLIST → AUDIO_LEVEL_CHECK → READY → (המשתמש מאשר) →
   לסוכני העריכה.
 - **Scene automation**: מעברי סצנות מתוזמנים/מבוססי-אודיו (מיקוד בדובר הפעיל) דרך
   `SetCurrentProgramScene` ו-batch requests המסונכרנים לקומפוזיציה.
+
+### 6.2.1 PTZ Camera Control — שליטת מצלמות מהממשק (דרישה 2, הרחבה)
+
+**מטרה:** לשלוט בתזוזת מצלמות PTS/PTZ (pan / tilt / zoom) ובפריסטים **ישירות מממשק
+StudioMaster** — עבור אולפנים עם מצלמות IP מסוג **Minrray** או **OBSBOT** (Tail Air).
+
+**עובדות פרוטוקול (מאומתות):**
+- שני המותגים מדברים **VISCA-over-IP** (UDP, פורט סטנדרטי **52381**) — זהו המכנה המשותף
+  שנבחר כפרוטוקול הראשי. OBSBOT Tail Air תומך **רק** ב-VISCA-over-IP (ולא VISCA-over-UART)
+  וב-NDI. Minrray תומך VISCA מלא + ONVIF + NDI.
+- **אילוץ קריטי:** ב-VISCA-over-IP רק **מקור שליטה אחד** יכול להתחבר למצלמה בו-זמנית מאותו
+  host. לכן אם תוסף `obs-ptz` כבר מחובר למצלמה, StudioMaster לא יכול להתחבר לאותה מצלמה
+  במקביל — צריך לבחור בעלים אחד לחיבור.
+
+**עיצוב — `PtzController` עם שני backends מאחורי interface אחיד:**
+
+```
+PtzController.move(camId, {pan, tilt, speed}) | zoom(camId, dir) | recallPreset(camId, n)
+   ├── ViscaIpBackend      (ראשי)  — client VISCA-over-IP ישיר, UDP :52381
+   └── ObsPtzBridgeBackend (חלופי) — מנתב דרך תוסף obs-ptz הקיים (obs-websocket vendor)
+```
+
+- **ViscaIpBackend (ברירת מחדל):** StudioMaster בעל החיבור. שליטה מלאה ומיידית מה-UI,
+  כולל פריסטים, מהירויות, ו-continuous pan/tilt כל עוד הכפתור לחוץ. עובד ל-Minrray ול-OBSBOT.
+- **ObsPtzBridgeBackend:** אם המשתמש כבר מריץ את תוסף `obs-ptz` (תומך VISCA serial/IP,
+  Pelco, ONVIF, USB UVC), נמנע מקונפליקט החיבור-היחיד ע"י ניתוב הפקודות דרך obs-websocket
+  אל התוסף, כך שהתוסף נשאר הבעלים היחיד של חיבור ה-VISCA.
+
+**UI:** לוח PTZ ב-Dashboard/Mixer — joystick לפאן/טילט, סליידר zoom, כפתורי פריסטים לכל
+מצלמה, ובורר מצלמה פעילה. אופציה עתידית: מיקוד אוטומטי על הדובר הפעיל (שילוב עם peak
+meters מ-§6.2) — pan/preset אוטומטי למי שמדבר.
+
+**מיפוי ל-timeline:** תזוזות/פריסטים נרשמים כ-`TimelineEvent` (kind=`camera`) — קלט
+נוסף לסוכני העריכה (למשל לבחור אוטומטית את הזווית הנכונה ב-multi-cam edit).
 
 ### 6.3 Cloud Sync + Session Recognizer (דרישה 3)
 
@@ -243,12 +292,14 @@ Recording done → Ingest job → [Transcribe] → [Analyze] → [Plan (EDL)] �
 ## 7. מודל נתונים (ליבה)
 
 ```
-StudioProfile      (id, name, programs[], lighting, obs, checklist[])
+StudioProfile      (id, name, programs[], lighting, obs, cameras[], checklist[])
+Camera             (id, label, brand[minrray|obsbot], control[visca-ip|obs-ptz-bridge|onvif],
+                    host, port, presets{name:index})
 Session            (id, profileId, calendarEventId?, title, guests[],
                     startedAt, endedAt, status, storagePath)
 MediaAsset         (id, sessionId, type[mix|cam|track|transcript|deliverable],
                     path, driveFileId?, durationMs, meta)
-Timeline Event     (id, sessionId, tMs, kind[scene|speaker|record|marker], data)
+Timeline Event     (id, sessionId, tMs, kind[scene|speaker|record|marker|camera], data)
 EditJob            (id, sessionId, stage, status, workerId, attempts, result)
 DeliverableTemplate(id, name, items[], style)
 ```

@@ -24,6 +24,13 @@ Electron בגלל ecosystem של Node (obs-websocket-js, googleapis, שליטת 
 מאחורי ה-interface הכללי `LightingAdapter`; אדפטרים אחרים (Art-Net/OSC/DMX-USB) יתווספו
 בעתיד ללא שינוי בשאר המערכת. פורמט פקודת ה-button/cue המדויק יאומת מול הוויקי הרשמי ב-Phase 1.
 
+### ADR-006: שליטת מצלמות PTZ — VISCA-over-IP
+מצלמות ה-PTZ (Minrray / OBSBOT Tail Air) נשלטות מהממשק דרך **VISCA-over-IP** (UDP, פורט
+**52381**) — המכנה המשותף לשני המותגים (OBSBOT Tail Air תומך רק VISCA-over-IP + NDI).
+מממשים `PtzController` עם `ViscaIpBackend` ישיר (ברירת מחדל, שליטה מלאה מה-UI) ו-backend
+חלופי שמנתב דרך תוסף `obs-ptz` הקיים. **אילוץ:** VISCA-over-IP מאפשר בעל-חיבור יחיד למצלמה
+בו-זמנית — או StudioMaster או obs-ptz, לא שניהם על אותו host.
+
 ---
 
 ## החלטות פתוחות — צריך קלט ממך

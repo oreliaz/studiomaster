@@ -38,10 +38,13 @@
 - [ ] אימות/הגדרת multi-track audio ב-OBS דרך websocket.
 - [ ] Mixer View: LED meters (InputVolumeMeters), בקרת עוצמה/mute per source.
 - [ ] ערוצי וידאו נפרדים: אינטגרציה עם Source Record filter (או POC של plugin נקודתי).
-- [ ] Timeline recorder: תיעוד סצנות/דוברים/markers ל-SQLite במהלך ההקלטה.
+- [ ] Timeline recorder: תיעוד סצנות/דוברים/markers/מצלמות ל-SQLite במהלך ההקלטה.
 - [ ] ניהול קבצי פלט: מבנה תיקיות עקבי per-session.
+- [ ] **PTZ Camera Control**: `PtzController` + `ViscaIpBackend` (UDP :52381) ל-Minrray/OBSBOT;
+      לוח PTZ ב-UI (joystick pan/tilt, zoom, presets, בורר מצלמה). גשר `obs-ptz` כחלופה.
 
-**Deliverable:** הקלטה שמפיקה קבצי שמע נפרדים + קובץ-לכל-מצלמה + תמהיל + timeline.
+**Deliverable:** הקלטה שמפיקה קבצי שמע נפרדים + קובץ-לכל-מצלמה + תמהיל + timeline,
+עם שליטת PTZ מלאה מהממשק.
 
 ---
 
