@@ -1,0 +1,125 @@
+import { z } from 'zod'
+
+/**
+ * Core data model for StudioMaster (docs/ARCHITECTURE.md §7).
+ *
+ * The zod schemas are the source of truth: the TypeScript types are inferred
+ * from them so validation and typing never drift apart. Studio profiles are
+ * user-authored JSON, so they are validated on load.
+ */
+
+// ─── Studio Launcher (requirement 1) ────────────────────────────────────────
+
+/** An external program the launcher starts when the studio opens. */
+export const programSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  args: z.array(z.string()).optional(),
+  /** How to know the program is ready before moving on. */
+  waitFor: z
+    .union([
+      z.literal('spawn'), // process handle exists
+      z.string().regex(/^window:/), // e.g. "window:QLC+"
+      z.string().regex(/^port:\d+$/), // e.g. "port:4455"
+      z.literal('websocket'), // OBS obs-websocket reachable
+    ])
+    .default('spawn'),
+  required: z.boolean().default(false),
+})
+export type Program = z.infer<typeof programSchema>
+
+/** FreeStyler is the first lighting adapter (docs ADR-005). */
+export const lightingConfigSchema = z.object({
+  adapter: z.enum(['freestyler', 'artnet', 'sacn', 'osc', 'dmx-usb']).default('freestyler'),
+  transport: z.enum(['http', 'midi']).default('http'),
+  host: z.string().default('127.0.0.1'),
+  port: z.number().int().positive().default(3332),
+  /** Named cues → adapter-specific command (e.g. "button:12"). */
+  cues: z.record(z.string(), z.string()).default({}),
+})
+export type LightingConfig = z.infer<typeof lightingConfigSchema>
+
+export const obsConfigSchema = z.object({
+  sceneCollection: z.string().optional(),
+  startScene: z.string().optional(),
+  /** Audio track index (1–6) → source name, for multi-track recording. */
+  audioTracks: z.record(z.string(), z.string()).default({}),
+})
+export type ObsConfig = z.infer<typeof obsConfigSchema>
+
+/** PTZ camera over IP — Minrray / OBSBOT (docs ADR-006). */
+export const cameraSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  brand: z.enum(['minrray', 'obsbot', 'generic']).default('generic'),
+  control: z.enum(['visca-ip', 'obs-ptz-bridge', 'onvif']).default('visca-ip'),
+  host: z.string(),
+  port: z.number().int().positive().default(52381),
+  /** Named preset → camera preset index. */
+  presets: z.record(z.string(), z.number().int().nonnegative()).default({}),
+})
+export type Camera = z.infer<typeof cameraSchema>
+
+export const studioProfileSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  programs: z.array(programSchema).default([]),
+  lighting: lightingConfigSchema.optional(),
+  obs: obsConfigSchema.default({ audioTracks: {} }),
+  cameras: z.array(cameraSchema).default([]),
+  /** Guided wizard steps that need a human eye. */
+  checklist: z.array(z.string()).default([]),
+})
+export type StudioProfile = z.infer<typeof studioProfileSchema>
+
+// ─── Session & media ─────────────────────────────────────────────────────────
+
+export type SessionStatus = 'idle' | 'preparing' | 'ready' | 'recording' | 'ended'
+
+export interface Session {
+  id: string
+  profileId: string
+  calendarEventId?: string
+  title: string
+  guests: string[]
+  startedAt?: string // ISO 8601
+  endedAt?: string
+  status: SessionStatus
+  storagePath?: string
+}
+
+export type MediaAssetType = 'mix' | 'cam' | 'track' | 'transcript' | 'review-doc' | 'deliverable'
+
+export interface MediaAsset {
+  id: string
+  sessionId: string
+  type: MediaAssetType
+  path: string
+  driveFileId?: string
+  durationMs?: number
+  meta?: Record<string, unknown>
+}
+
+// ─── Timeline & review markers (requirement 2++) ─────────────────────────────
+
+export type TimelineEventKind = 'scene' | 'speaker' | 'record' | 'marker' | 'camera'
+
+export interface TimelineEvent {
+  id: string
+  sessionId: string
+  tMs: number // offset from recording start
+  kind: TimelineEventKind
+  data?: Record<string, unknown>
+}
+
+export type ReviewMarkerCategory = 'fix' | 'highlight' | 'chapter' | 'note'
+
+/** A timecode marker dropped by the review hotkey (docs §6.2.2). */
+export interface ReviewMarker {
+  id: string
+  sessionId: string
+  tcMs: number // OBS record timecode in ms
+  category: ReviewMarkerCategory
+  note?: string
+  createdAt: string // ISO 8601
+}
