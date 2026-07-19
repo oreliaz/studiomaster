@@ -12,11 +12,15 @@ StudioMaster מנהלת את מחזור החיים המלא של הקלטת או
 
 ## סטטוס
 
-שלב תכנון. הארכיטקטורה והתכנית המלאה:
+כל ארבע היכולות מיושמות (Phases 0–5). מריצים עם `npm install && npm run dev` (ראה
+[`docs/DEV.md`](docs/DEV.md)).
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — ארכיטקטורה מלאה ועיצוב מודולים.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md) — מפת דרכים בשלבים.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — מפת דרכים בשלבים (מה בוצע ומה נותר).
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — החלטות ארכיטקטוניות והחלטות פתוחות.
+- [`docs/DEV.md`](docs/DEV.md) — התקנה, בדיקות, אריזה, והגדרת Google/AI.
+
+**בדיקות:** `npm run typecheck` · `npm test` (TS) · `npm run test:py` (Python).
 
 ## עקרון מרכזי
 
