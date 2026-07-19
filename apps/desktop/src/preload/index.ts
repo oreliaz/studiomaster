@@ -12,6 +12,7 @@ import {
   type ReviewMarkerCategory,
   type StudioMasterApi,
   type StudioProfile,
+  type UploadProgress,
   type WizardState,
 } from '@studiomaster/shared'
 
@@ -67,12 +68,25 @@ const api: StudioMasterApi = {
     list: () => ipcRenderer.invoke('markers:list'),
     updateNote: (id: string, note: string) => ipcRenderer.invoke('markers:update-note', id, note),
   },
+  cloud: {
+    getAuthStatus: () => ipcRenderer.invoke('cloud:get-auth-status'),
+    setCredentials: (id: string, secret: string) =>
+      ipcRenderer.invoke('cloud:set-credentials', id, secret),
+    connect: () => ipcRenderer.invoke('cloud:connect'),
+    disconnect: () => ipcRenderer.invoke('cloud:disconnect'),
+    listTodayEvents: () => ipcRenderer.invoke('cloud:list-today-events'),
+    listSessions: () => ipcRenderer.invoke('cloud:list-sessions'),
+    recognizeSession: (id: string) => ipcRenderer.invoke('cloud:recognize-session', id),
+    uploadSession: (id: string) => ipcRenderer.invoke('cloud:upload-session', id),
+  },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),
   onRecordState: (cb: (state: ObsRecordState) => void) => subscribe(IPC_EVENTS.obsRecord, cb),
   onWizardState: (cb: (state: WizardState) => void) => subscribe(IPC_EVENTS.wizard, cb),
   onMixerLevels: (cb: (levels: InputLevel[]) => void) => subscribe(IPC_EVENTS.mixerLevels, cb),
   onMarkerAdded: (cb: (marker: ReviewMarker) => void) => subscribe(IPC_EVENTS.markerAdded, cb),
+  onUploadProgress: (cb: (progress: UploadProgress) => void) =>
+    subscribe(IPC_EVENTS.uploadProgress, cb),
 }
 
 contextBridge.exposeInMainWorld('studiomaster', api)

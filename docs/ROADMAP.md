@@ -56,12 +56,14 @@
 
 ## Phase 3 — ענן וזיהוי (שבועות 6–7) — *דרישה 3*
 
-- [ ] Google OAuth2 (loopback) + אחסון token מוצפן (keytar/DPAPI).
-- [ ] Calendar: שליפת אירועי היום + התאמה ל-session (זיהוי תוכן/אורחים).
-- [ ] Drive: העלאת תוצרים (resumable) למבנה תיקיות לפי תאריך/פגישה, עם progress + retry.
-- [ ] Session Recognizer: מיזוג יומן+diarization+metadata לפרופיל תוכן.
+- [x] Google OAuth2 (loopback) + אחסון token מוצפן ב-`safeStorage` (DPAPI ב-Windows).
+- [x] Calendar: שליפת אירועי היום + התאמה אוטומטית ל-session בסיום הקלטה (title/אורחים).
+- [x] Drive: `ensureFolder` (StudioMaster/<session>) + העלאת כל קבצי ה-session עם progress.
+- [x] Session Recognizer: מיזוג אירוע יומן חופף → SessionSummary (title, calendarEventId, guests).
+- [x] Cloud view: חיבור/ניתוק Google, אירועי היום, רשימת הקלטות + זיהוי + העלאה.
 
-**Deliverable:** בסיום הקלטה, הכל עולה ל-Drive ומזוהה מול אירוע היומן.
+**Deliverable:** ✅ חיבור Google (OAuth loopback), זיהוי אוטומטי מול היומן בסיום הקלטה,
+והעלאת ה-session ל-Drive מהממשק. *(diarization מלא — ב-Phase 4; retry/backoff — להעמקה.)*
 
 ---
 

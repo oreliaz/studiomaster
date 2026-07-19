@@ -6,6 +6,7 @@ import {
   type ObsConnectionParams,
   type ReviewMarker,
   type ReviewMarkerCategory,
+  type SessionSummary,
   type StudioProfile,
 } from '@studiomaster/shared'
 
@@ -50,6 +51,11 @@ const MIGRATIONS: string[] = [
      note       TEXT,
      created_at TEXT NOT NULL
    );`,
+  `CREATE TABLE IF NOT EXISTS session_records (
+     id         TEXT PRIMARY KEY,
+     started_at TEXT NOT NULL,
+     json       TEXT NOT NULL
+   );`,
 ]
 
 export interface Store {
@@ -64,6 +70,9 @@ export interface Store {
   addMarker(marker: ReviewMarker): void
   listMarkers(sessionId?: string): ReviewMarker[]
   updateMarkerNote(id: string, note: string): void
+  saveSession(session: SessionSummary): void
+  getSession(id: string): SessionSummary | null
+  listSessions(): SessionSummary[]
 }
 
 const OBS_CONNECTION_KEY = 'obs.connection'
@@ -163,6 +172,27 @@ class SqliteStore implements Store {
   updateMarkerNote(id: string, note: string): void {
     this.db.prepare('UPDATE markers SET note = ? WHERE id = ?').run(note, id)
   }
+
+  saveSession(session: SessionSummary): void {
+    this.db
+      .prepare(
+        'INSERT INTO session_records (id, started_at, json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET started_at = excluded.started_at, json = excluded.json',
+      )
+      .run(session.id, session.startedAt, JSON.stringify(session))
+  }
+
+  getSession(id: string): SessionSummary | null {
+    const row = this.db.prepare('SELECT json FROM session_records WHERE id = ?').get(id) as
+      { json: string } | undefined
+    return row ? (JSON.parse(row.json) as SessionSummary) : null
+  }
+
+  listSessions(): SessionSummary[] {
+    const rows = this.db
+      .prepare('SELECT json FROM session_records ORDER BY started_at DESC')
+      .all() as { json: string }[]
+    return rows.map((r) => JSON.parse(r.json) as SessionSummary)
+  }
 }
 
 interface MarkerRow {
@@ -190,6 +220,7 @@ class MemoryStore implements Store {
   private readonly settings = new Map<string, string>()
   private readonly profiles = new Map<string, StudioProfile>()
   private readonly markers: ReviewMarker[] = []
+  private readonly sessions = new Map<string, SessionSummary>()
 
   getSetting(key: string): string | null {
     return this.settings.get(key) ?? null
@@ -228,6 +259,15 @@ class MemoryStore implements Store {
   updateMarkerNote(id: string, note: string): void {
     const marker = this.markers.find((m) => m.id === id)
     if (marker) marker.note = note
+  }
+  saveSession(session: SessionSummary): void {
+    this.sessions.set(session.id, session)
+  }
+  getSession(id: string): SessionSummary | null {
+    return this.sessions.get(id) ?? null
+  }
+  listSessions(): SessionSummary[] {
+    return [...this.sessions.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
   }
 }
 

@@ -20,6 +20,7 @@
     "@studiomaster/shared": "*",
     "@studiomaster/studio-launcher": "*",
     "better-sqlite3": "^11.3.0",
+    "googleapis": "^144.0.0",
     "obs-websocket-js": "^5.0.6",
     "zod": "^3.23.8"
   },

@@ -2,6 +2,7 @@ import type { ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.
 import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
+import type { CalendarEvent, GoogleAuthStatus, SessionSummary, UploadProgress } from './cloud.js'
 import type { WizardState } from './wizard.js'
 
 /**
@@ -17,6 +18,7 @@ export const IPC_EVENTS = {
   wizard: 'wizard:state',
   mixerLevels: 'mixer:levels',
   markerAdded: 'markers:added',
+  uploadProgress: 'cloud:upload-progress',
 } as const
 
 export interface StudioMasterApi {
@@ -64,9 +66,22 @@ export interface StudioMasterApi {
     list(): Promise<ReviewMarker[]>
     updateNote(id: string, note: string): Promise<void>
   }
+  cloud: {
+    getAuthStatus(): Promise<GoogleAuthStatus>
+    setCredentials(clientId: string, clientSecret: string): Promise<GoogleAuthStatus>
+    connect(): Promise<GoogleAuthStatus>
+    disconnect(): Promise<void>
+    listTodayEvents(): Promise<CalendarEvent[]>
+    listSessions(): Promise<SessionSummary[]>
+    /** Match a session to an overlapping calendar event and store metadata. */
+    recognizeSession(sessionId: string): Promise<SessionSummary | null>
+    /** Upload all files in a session's folder to Drive (progress via event). */
+    uploadSession(sessionId: string): Promise<SessionSummary | null>
+  }
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void
   onRecordState(cb: (state: ObsRecordState) => void): () => void
   onWizardState(cb: (state: WizardState) => void): () => void
   onMixerLevels(cb: (levels: InputLevel[]) => void): () => void
   onMarkerAdded(cb: (marker: ReviewMarker) => void): () => void
+  onUploadProgress(cb: (progress: UploadProgress) => void): () => void
 }

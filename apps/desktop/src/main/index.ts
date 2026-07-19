@@ -16,9 +16,11 @@ import {
   type StudioProfile,
   type WizardState,
 } from '@studiomaster/shared'
+import type { UploadProgress } from '@studiomaster/shared'
 import { createStore } from './store.js'
 import { WizardOrchestrator } from './wizard.js'
 import { RecordingSessionManager } from './session.js'
+import { CloudService } from './cloud.js'
 
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
@@ -28,6 +30,9 @@ const store = createStore()
 const obs = new ObsController()
 const session = new RecordingSessionManager(store)
 const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVENTS.wizard, state))
+const cloud = new CloudService(store, (p: UploadProgress) =>
+  broadcast(IPC_EVENTS.uploadProgress, p),
+)
 
 let ptzController: PtzController | null = null
 let ptzProfileId: string | null | undefined = undefined
@@ -60,10 +65,13 @@ obs.on('levels', (levels: InputLevel[]) => broadcast(IPC_EVENTS.mixerLevels, lev
 obs.on('record', (state: ObsRecordState) => {
   broadcast(IPC_EVENTS.obsRecord, state)
   if (state.active && !session.session) {
-    session.start()
+    session.start(store.getSetting(ACTIVE_PROFILE_KEY) ?? undefined)
     applyRecordLighting()
   } else if (!state.active && session.session) {
+    const finished = session.session.id
     session.end()
+    // Auto-recognize the session against today's calendar (best-effort).
+    void cloud.recognizeSession(finished).catch(() => undefined)
   }
 })
 
@@ -157,6 +165,18 @@ function registerIpc(): void {
   ipcMain.handle('markers:update-note', (_e, id: string, note: string) =>
     store.updateMarkerNote(id, note),
   )
+
+  // Cloud (Google Drive + Calendar)
+  ipcMain.handle('cloud:get-auth-status', () => cloud.getAuthStatus())
+  ipcMain.handle('cloud:set-credentials', (_e, id: string, secret: string) =>
+    cloud.setCredentials(id, secret),
+  )
+  ipcMain.handle('cloud:connect', () => cloud.connect())
+  ipcMain.handle('cloud:disconnect', () => cloud.disconnect())
+  ipcMain.handle('cloud:list-today-events', () => cloud.listTodayEvents())
+  ipcMain.handle('cloud:list-sessions', () => cloud.listSessions())
+  ipcMain.handle('cloud:recognize-session', (_e, id: string) => cloud.recognizeSession(id))
+  ipcMain.handle('cloud:upload-session', (_e, id: string) => cloud.uploadSession(id))
 }
 
 /** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */

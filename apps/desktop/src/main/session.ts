@@ -33,16 +33,29 @@ export class RecordingSessionManager {
     return this.current
   }
 
-  start(): RecordingSession {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  start(profileId?: string): RecordingSession {
+    const startedAt = new Date().toISOString()
+    const stamp = startedAt.replace(/[:.]/g, '-')
     const storagePath = join(app.getPath('userData'), 'recordings', stamp)
     mkdirSync(storagePath, { recursive: true })
-    this.current = { id: randomUUID(), storagePath, startedAt: new Date().toISOString() }
+    this.current = { id: randomUUID(), storagePath, startedAt }
+    this.store.saveSession({
+      id: this.current.id,
+      startedAt,
+      storagePath,
+      profileId,
+      guests: [],
+      uploaded: false,
+    })
     this.writeReviewHeader()
     return this.current
   }
 
   end(): void {
+    if (this.current) {
+      const record = this.store.getSession(this.current.id)
+      if (record) this.store.saveSession({ ...record, endedAt: new Date().toISOString() })
+    }
     this.current = null
   }
 
