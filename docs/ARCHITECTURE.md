@@ -30,14 +30,14 @@ StudioMaster היא תוכנת שולחן עבודה ל-Windows שמנהלת א�
 
 OBS Studio בנוי בשכבות:
 
-| שכבה | תפקיד | מה זה נותן לנו |
-|------|-------|----------------|
-| **libobs** | ליבת המנוע: pipeline וידאו/שמע, ניהול מקורות/פלטים/מקודדים | מנוע ההקלטה עצמו — לא בונים אותו מחדש |
-| **Sources** | לכידת מסך/מצלמה/שמע, וידאו, תמונות, פילטרים | מצלמות, מיקרופונים, capture — מוגדרים כמקורות |
-| **Outputs** | פלט מקודד/גולמי: streaming, recording | הקלטה מרובת-track יושבת כאן |
-| **Encoders / Services** | קידוד x264/NVENC, יעדי streaming | קידוד איכותי מובנה |
-| **Frontend (Qt)** | ה-UI, סצנות, פרופילים, scene collections | ה-UI שהמשתמש מכיר — נשאר |
-| **obs-websocket 5.x** | RPC over WebSocket, פורט 4455, כולל Vendor API | **נקודת החיבור שלנו** |
+| שכבה                    | תפקיד                                                      | מה זה נותן לנו                                |
+| ----------------------- | ---------------------------------------------------------- | --------------------------------------------- |
+| **libobs**              | ליבת המנוע: pipeline וידאו/שמע, ניהול מקורות/פלטים/מקודדים | מנוע ההקלטה עצמו — לא בונים אותו מחדש         |
+| **Sources**             | לכידת מסך/מצלמה/שמע, וידאו, תמונות, פילטרים                | מצלמות, מיקרופונים, capture — מוגדרים כמקורות |
+| **Outputs**             | פלט מקודד/גולמי: streaming, recording                      | הקלטה מרובת-track יושבת כאן                   |
+| **Encoders / Services** | קידוד x264/NVENC, יעדי streaming                           | קידוד איכותי מובנה                            |
+| **Frontend (Qt)**       | ה-UI, סצנות, פרופילים, scene collections                   | ה-UI שהמשתמש מכיר — נשאר                      |
+| **obs-websocket 5.x**   | RPC over WebSocket, פורט 4455, כולל Vendor API             | **נקודת החיבור שלנו**                         |
 
 **עובדות מפתח שמעצבות את התכנית:**
 
@@ -90,14 +90,14 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 
 ## 4. מפת רכיבים לפי הדרישות
 
-| # | דרישה | רכיב אחראי | מנגנון |
-|---|-------|------------|--------|
-| 1 | פתיחת תוכנות + אשף הפעלה | **Studio Launcher** + **Onboarding Wizard** | פרופילי אולפן (JSON), הפעלת תהליכים, בקרת תאורה, checklist מודרך |
-| 2 | הקלטה + ניתוב + ערוצים נפרדים | **Recording Controller** | obs-websocket: multi-track audio, source-record per camera, בקרת עוצמות |
-| 2+ | שליטת מצלמות PTZ מהממשק | **PTZ Camera Control** | VISCA-over-IP (:52381) ל-Minrray/OBSBOT, או גשר ל-obs-ptz; pan/tilt/zoom + presets |
-| 2++ | Hotkey לסימון תיקונים + חיווי ב-OBS | **Review Markers** | globalShortcut → מסמך טיימקודים + `SetSceneItemEnabled` לחיווי ויזואלי ב-OBS |
-| 3 | העלאה + Drive + Calendar + זיהוי | **Cloud Sync** + **Session Recognizer** | googleapis, התאמת session ל-Calendar event, מטא-דאטה |
-| 4 | סוכני עריכה אוטונומיים | **AI Editing Agents** | תור עבודות → Python workers → ffmpeg/whisper/Claude → EDL → render |
+| #   | דרישה                               | רכיב אחראי                                  | מנגנון                                                                             |
+| --- | ----------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 1   | פתיחת תוכנות + אשף הפעלה            | **Studio Launcher** + **Onboarding Wizard** | פרופילי אולפן (JSON), הפעלת תהליכים, בקרת תאורה, checklist מודרך                   |
+| 2   | הקלטה + ניתוב + ערוצים נפרדים       | **Recording Controller**                    | obs-websocket: multi-track audio, source-record per camera, בקרת עוצמות            |
+| 2+  | שליטת מצלמות PTZ מהממשק             | **PTZ Camera Control**                      | VISCA-over-IP (:52381) ל-Minrray/OBSBOT, או גשר ל-obs-ptz; pan/tilt/zoom + presets |
+| 2++ | Hotkey לסימון תיקונים + חיווי ב-OBS | **Review Markers**                          | globalShortcut → מסמך טיימקודים + `SetSceneItemEnabled` לחיווי ויזואלי ב-OBS       |
+| 3   | העלאה + Drive + Calendar + זיהוי    | **Cloud Sync** + **Session Recognizer**     | googleapis, התאמת session ל-Calendar event, מטא-דאטה                               |
+| 4   | סוכני עריכה אוטונומיים              | **AI Editing Agents**                       | תור עבודות → Python workers → ffmpeg/whisper/Claude → EDL → render                 |
 
 ---
 
@@ -107,21 +107,21 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 (`obs-websocket-js`, `googleapis`, שליטת תהליכים ב-Windows). Electron מקצר משמעותית זמן
 פיתוח וה-overhead זניח על חומרת אולפן.
 
-| שכבה | טכנולוגיה | נימוק |
-|------|-----------|-------|
-| Desktop shell | **Electron + TypeScript** | ecosystem, Windows APIs, מהירות פיתוח |
-| UI | **React + Vite + Tailwind** | אשף, dashboard, mixer view |
-| Orchestrator | **Node.js (Main process)** | state machine, ניהול תת-מערכות |
-| OBS control | **obs-websocket-js v5** | client רשמי לפרוטוקול 5.x |
-| PTZ control | **VISCA-over-IP** (UDP :52381) native, או גשר ל-obs-ptz | Minrray + OBSBOT Tail Air |
-| מצב מקומי | **SQLite (better-sqlite3)** | sessions, jobs, prefs — ללא שרת |
-| תור עבודות | **תור מבוסס-SQLite** (או BullMQ אם נדרש Redis) | פשטות, ללא תלות חיצונית ל-MVP |
-| Google | **googleapis (Node)** + OAuth2 (loopback) | Drive + Calendar רשמי |
-| AI workers | **Python 3.11+** microservice | ffmpeg, faster-whisper, ניתוח וידאו |
-| קידוד/עריכה | **ffmpeg** | חיתוך, render, מיזוג ערוצים |
-| תמלול | **faster-whisper** (מקומי) | תמלול + timestamps ללא עלות ענן |
-| החלטות תוכן | **Claude API (claude-opus-4-8 / sonnet)** | הבנת תוכן, EDL, כותרות, פרקים |
-| תקשורת workers↔desktop | HTTP מקומי / gRPC / קבצי job | פשוט וניתן לבדיקה |
+| שכבה                   | טכנולוגיה                                               | נימוק                                 |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------- |
+| Desktop shell          | **Electron + TypeScript**                               | ecosystem, Windows APIs, מהירות פיתוח |
+| UI                     | **React + Vite + Tailwind**                             | אשף, dashboard, mixer view            |
+| Orchestrator           | **Node.js (Main process)**                              | state machine, ניהול תת-מערכות        |
+| OBS control            | **obs-websocket-js v5**                                 | client רשמי לפרוטוקול 5.x             |
+| PTZ control            | **VISCA-over-IP** (UDP :52381) native, או גשר ל-obs-ptz | Minrray + OBSBOT Tail Air             |
+| מצב מקומי              | **SQLite (better-sqlite3)**                             | sessions, jobs, prefs — ללא שרת       |
+| תור עבודות             | **תור מבוסס-SQLite** (או BullMQ אם נדרש Redis)          | פשטות, ללא תלות חיצונית ל-MVP         |
+| Google                 | **googleapis (Node)** + OAuth2 (loopback)               | Drive + Calendar רשמי                 |
+| AI workers             | **Python 3.11+** microservice                           | ffmpeg, faster-whisper, ניתוח וידאו   |
+| קידוד/עריכה            | **ffmpeg**                                              | חיתוך, render, מיזוג ערוצים           |
+| תמלול                  | **faster-whisper** (מקומי)                              | תמלול + timestamps ללא עלות ענן       |
+| החלטות תוכן            | **Claude API (claude-opus-4-8 / sonnet)**               | הבנת תוכן, EDL, כותרות, פרקים         |
+| תקשורת workers↔desktop | HTTP מקומי / gRPC / קבצי job                            | פשוט וניתן לבדיקה                     |
 
 ---
 
@@ -138,40 +138,51 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 {
   "id": "studio-a",
   "name": "אולפן ראשי",
-  "programs": [                     // תוכנות להפעלה
+  "programs": [
+    // תוכנות להפעלה
     { "name": "OBS", "path": "C:/.../obs64.exe", "waitFor": "websocket", "required": true },
-    { "name": "Lighting Control", "path": "C:/.../QLC.exe", "waitFor": "window:QLC+" }
+    { "name": "Lighting Control", "path": "C:/.../QLC.exe", "waitFor": "window:QLC+" },
   ],
-  "lighting": {                     // בקרת תאורה — FreeStyler
-    "adapter": "freestyler",        // freestyler | artnet | sacn | osc | dmx-usb
-    "transport": "http",            // http (webserver :3332) | midi
+  "lighting": {
+    // בקרת תאורה — FreeStyler
+    "adapter": "freestyler", // freestyler | artnet | sacn | osc | dmx-usb
+    "transport": "http", // http (webserver :3332) | midi
     "host": "127.0.0.1",
     "port": 3332,
-    "cues": { "record": "button:12", "standby": "button:1" }
+    "cues": { "record": "button:12", "standby": "button:1" },
   },
   "obs": {
     "sceneCollection": "StudioA",
     "startScene": "Standby",
-    "audioTracks": { "1": "mix", "2": "host-mic", "3": "guest-mic", "4": "system" }
+    "audioTracks": { "1": "mix", "2": "host-mic", "3": "guest-mic", "4": "system" },
   },
-  "cameras": [                      // מצלמות PTZ over IP (Minrray / OBSBOT)
+  "cameras": [
+    // מצלמות PTZ over IP (Minrray / OBSBOT)
     {
-      "id": "cam-host", "label": "מארח", "brand": "obsbot",
-      "control": "visca-ip",       // visca-ip | obs-ptz-bridge | onvif
-      "host": "192.168.1.71", "port": 52381,
-      "presets": { "wide": 1, "closeup": 2, "two-shot": 3 }
+      "id": "cam-host",
+      "label": "מארח",
+      "brand": "obsbot",
+      "control": "visca-ip", // visca-ip | obs-ptz-bridge | onvif
+      "host": "192.168.1.71",
+      "port": 52381,
+      "presets": { "wide": 1, "closeup": 2, "two-shot": 3 },
     },
     {
-      "id": "cam-guest", "label": "אורח", "brand": "minrray",
-      "control": "visca-ip", "host": "192.168.1.72", "port": 52381,
-      "presets": { "wide": 1, "closeup": 2 }
-    }
+      "id": "cam-guest",
+      "label": "אורח",
+      "brand": "minrray",
+      "control": "visca-ip",
+      "host": "192.168.1.72",
+      "port": 52381,
+      "presets": { "wide": 1, "closeup": 2 },
+    },
   ],
-  "checklist": [                    // צעדי אשף מודרכים
+  "checklist": [
+    // צעדי אשף מודרכים
     "ודא שהמצלמות דולקות",
     "בדוק סימון עוצמה על מיקרופון מארח (-12dB)",
-    "ודא תאורה במצב 'record'"
-  ]
+    "ודא תאורה במצב 'record'",
+  ],
 }
 ```
 
@@ -216,6 +227,7 @@ GUIDED_CHECKLIST → AUDIO_LEVEL_CHECK → READY → (המשתמש מאשר) →
 StudioMaster** — עבור אולפנים עם מצלמות IP מסוג **Minrray** או **OBSBOT** (Tail Air).
 
 **עובדות פרוטוקול (מאומתות):**
+
 - שני המותגים מדברים **VISCA-over-IP** (UDP, פורט סטנדרטי **52381**) — זהו המכנה המשותף
   שנבחר כפרוטוקול הראשי. OBSBOT Tail Air תומך **רק** ב-VISCA-over-IP (ולא VISCA-over-UART)
   וב-NDI. Minrray תומך VISCA מלא + ONVIF + NDI.
@@ -252,6 +264,7 @@ meters מ-§6.2) — pan/preset אוטומטי למי שמדבר.
 הסימונים בעריכה.
 
 **איך זה עובד:**
+
 - **Global Hotkey** — Electron `globalShortcut` רושם קיצור מערכת-כללי שעובד גם כשה-focus
   על OBS או כשהאפליקציה ברקע. ניתן להגדיר כמה קיצורים לפי **קטגוריה** (תיקון / הדגשה /
   פרק / הערה כללית).
@@ -353,13 +366,13 @@ DeliverableTemplate(id, name, items[], style)
 
 ## 9. סיכונים והפחתה
 
-| סיכון | הפחתה |
-|-------|-------|
-| שינויי פרוטוקול OBS בין גרסאות | client רשמי + version negotiation; e2e tests מול OBS |
-| ערוצי וידאו נפרדים לא ב-core | Source Record filter / plugin נקודתי, מתועד כתלות |
-| מגוון פרוטוקולי תאורה | Adapter pattern; מתחילים ב-OSC+Art-Net, מרחיבים לפי צורך |
-| עלות/זמן של AI על וידאו ארוך | תמלול מקומי (whisper), LLM רק על טקסט/EDL, לא על פיקסלים |
-| כשל העלאה בקבצים גדולים | resumable uploads + retry/backoff + תור עמיד |
+| סיכון                          | הפחתה                                                    |
+| ------------------------------ | -------------------------------------------------------- |
+| שינויי פרוטוקול OBS בין גרסאות | client רשמי + version negotiation; e2e tests מול OBS     |
+| ערוצי וידאו נפרדים לא ב-core   | Source Record filter / plugin נקודתי, מתועד כתלות        |
+| מגוון פרוטוקולי תאורה          | Adapter pattern; מתחילים ב-OSC+Art-Net, מרחיבים לפי צורך |
+| עלות/זמן של AI על וידאו ארוך   | תמלול מקומי (whisper), LLM רק על טקסט/EDL, לא על פיקסלים |
+| כשל העלאה בקבצים גדולים        | resumable uploads + retry/backoff + תור עמיד             |
 
 ---
 

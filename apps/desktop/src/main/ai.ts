@@ -14,8 +14,12 @@ import type { Store } from './store.js'
 export class AiEditor {
   constructor(private readonly store: Store) {}
 
-  /** Locate the services/ai-workers directory (dev layout). */
+  /** Locate the services/ai-workers directory (packaged vs dev layout). */
   private workersDir(): string {
+    if (app.isPackaged) {
+      // Bundled via electron-builder extraResources → resources/ai-workers.
+      return join(process.resourcesPath, 'ai-workers')
+    }
     return resolve(app.getAppPath(), '..', '..', 'services', 'ai-workers')
   }
 

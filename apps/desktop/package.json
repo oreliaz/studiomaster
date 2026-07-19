@@ -8,6 +8,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "dist:win": "electron-vite build && electron-builder --win --config electron-builder.yml",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",
     "@types/better-sqlite3": "^7.6.11",
+    "electron-builder": "^24.13.3",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",

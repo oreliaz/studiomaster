@@ -39,6 +39,10 @@ const ai = new AiEditor(store)
 let ptzController: PtzController | null = null
 let ptzProfileId: string | null | undefined = undefined
 
+// Never let a stray error take down the process silently.
+process.on('uncaughtException', (err) => console.error('[main] uncaught exception:', err))
+process.on('unhandledRejection', (reason) => console.error('[main] unhandled rejection:', reason))
+
 function broadcast<T>(channel: string, payload: T): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
 }

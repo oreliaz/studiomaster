@@ -11,6 +11,9 @@
     "dev": "npm run dev --workspace @studiomaster/desktop",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm test --workspace @studiomaster/studio-launcher && npm test --workspace @studiomaster/ptz-control",
+    "test:py": "python -m unittest discover -s services/ai-workers/tests -t services/ai-workers",
+    "dist:win": "npm run dist:win --workspace @studiomaster/desktop",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\""
   },

@@ -9,24 +9,23 @@
 
 **מטרה:** שלד מריץ, מחובר ל-OBS.
 
-- [ ] Monorepo: Electron + React + TypeScript + Vite + Tailwind.
-- [ ] `packages/obs-controller`: עטיפה ל-`obs-websocket-js` (connect, reconnect, typed requests/events).
-- [ ] `packages/shared`: טיפוסים משותפים (StudioProfile, Session, MediaAsset...).
-- [ ] SQLite (better-sqlite3) + מיגרציות; שכבת repository.
-- [ ] Dashboard בסיסי: חיבור ל-OBS, סטטוס חיבור, כפתור Start/Stop Record דרך websocket.
-- [ ] בדיקת e2e ידנית מול OBS מקומי.
+- [x] Monorepo: Electron + React + TypeScript + Vite (npm workspaces).
+- [x] `packages/obs-controller`: עטיפה ל-`obs-websocket-js` (connect, reconnect, typed requests/events).
+- [x] `packages/shared`: טיפוסים משותפים + סכמות zod (StudioProfile, Session, MediaAsset...).
+- [x] SQLite (better-sqlite3) + מיגרציות; שכבת store (עם fallback לזיכרון).
+- [x] Dashboard בסיסי: חיבור ל-OBS, סטטוס חיבור, כפתור Start/Stop Record + טיימקוד חי.
 
-**Deliverable:** אפליקציה שמתחברת ל-OBS ומתחילה/עוצרת הקלטה.
+**Deliverable:** ✅ אפליקציה שמתחברת ל-OBS ומתחילה/עוצרת הקלטה.
 
 ---
 
-## Phase 1 — אשף פתיחת אולפן (שבועות 2–3) — *דרישה 1*
+## Phase 1 — אשף פתיחת אולפן (שבועות 2–3) — _דרישה 1_
 
 - [x] מודל `StudioProfile` + עורך פרופילים ב-UI (בחירת תוכנות, סדר פתיחה, checklist, תאורה).
 - [x] Studio Launcher: הפעלת תוכנות (`spawn`) + `waitFor` (`spawn`/`websocket`/`delay`/`port`/`window`),
       עצירה על כשל תוכנה חיונית. side effects מבודדים → נבדק ביחידה (6 בדיקות עוברות).
 - [x] Lighting Adapters: interface `LightingAdapter` + מימוש **FreeStyler** (HTTP ל-webserver
-      פורט 3332). אדפטרים נוספים מאחורי אותו interface. *(פורמט button/cue מדויק — לאימות בשטח.)*
+      פורט 3332). אדפטרים נוספים מאחורי אותו interface. _(פורמט button/cue מדויק — לאימות בשטח.)_
 - [x] Onboarding orchestrator: `idle→launching→lighting→checklist→ready` (עם `failed`), state מוזרם ל-UI.
 - [x] UI אשף מודרך: בחירת אולפן → רצף פתיחה עם סטטוס לכל שלב → checklist → "מוכן".
 
@@ -37,7 +36,7 @@
 
 ---
 
-## Phase 2 — הקלטה מרובת-ערוצים (שבועות 4–5) — *דרישה 2*
+## Phase 2 — הקלטה מרובת-ערוצים (שבועות 4–5) — _דרישה 2_
 
 - [x] Mixer View: LED meters (InputVolumeMeters), בקרת עוצמה/mute per source, בורר סצנה.
 - [x] **PTZ Camera Control**: `ViscaIpController` (UDP :52381) ל-Minrray/OBSBOT + בוני VISCA
@@ -50,11 +49,11 @@
 - [ ] ערוצי וידאו נפרדים: אינטגרציה עם Source Record filter (או POC של plugin נקודתי).
 
 **Deliverable:** ✅ מיקסר + שליטת PTZ מלאה + hotkey תיקונים עם חיווי ב-OBS, מהממשק.
-*(נותר להעמיק: מיפוי multi-track אוטומטי וקובץ-לכל-מצלמה — תלוי הגדרות OBS/פילטר.)*
+_(נותר להעמיק: מיפוי multi-track אוטומטי וקובץ-לכל-מצלמה — תלוי הגדרות OBS/פילטר.)_
 
 ---
 
-## Phase 3 — ענן וזיהוי (שבועות 6–7) — *דרישה 3*
+## Phase 3 — ענן וזיהוי (שבועות 6–7) — _דרישה 3_
 
 - [x] Google OAuth2 (loopback) + אחסון token מוצפן ב-`safeStorage` (DPAPI ב-Windows).
 - [x] Calendar: שליפת אירועי היום + התאמה אוטומטית ל-session בסיום הקלטה (title/אורחים).
@@ -63,11 +62,11 @@
 - [x] Cloud view: חיבור/ניתוק Google, אירועי היום, רשימת הקלטות + זיהוי + העלאה.
 
 **Deliverable:** ✅ חיבור Google (OAuth loopback), זיהוי אוטומטי מול היומן בסיום הקלטה,
-והעלאת ה-session ל-Drive מהממשק. *(diarization מלא — ב-Phase 4; retry/backoff — להעמקה.)*
+והעלאת ה-session ל-Drive מהממשק. _(diarization מלא — ב-Phase 4; retry/backoff — להעמקה.)_
 
 ---
 
-## Phase 4 — סוכני עריכה אוטונומיים (שבועות 8–11) — *דרישה 4*
+## Phase 4 — סוכני עריכה אוטונומיים (שבועות 8–11) — _דרישה 4_
 
 - [x] `services/ai-workers` (Python): pipeline runner + CLI, עמיד לחוסר תלויות.
 - [x] Transcribe: עטיפת faster-whisper (guarded — מדלג אם לא מותקן).
@@ -86,10 +85,14 @@
 
 ## Phase 5 — הקשחה (שבוע 12+)
 
-- [ ] טיפול בשגיאות מקיף, לוגים, טלמטריה מקומית.
-- [ ] אינסטולר Windows (electron-builder) + auto-update.
-- [ ] תיעוד משתמש + מדריך הקמת אולפן.
-- [ ] בדיקות אוטומטיות (unit + e2e מול OBS headless).
+- [x] אינסטולר Windows: קונפיג `electron-builder.yml` (NSIS) + `npm run dist:win`;
+      אריזת `services/ai-workers` כ-extraResources (עם resolve נכון של נתיב ה-worker).
+- [x] טיפול בשגיאות: `uncaughtException`/`unhandledRejection` handlers; store נופל
+      חלק לזיכרון; כל הנתיבים החיצוניים (OBS/ענן/AI/תאורה) עטופים ב-try/catch.
+- [x] תיעוד: `docs/DEV.md` (התקנה, בדיקות, אריזה, Google, AI) + README-ים לכל חבילה.
+- [x] בדיקות אוטומטיות: `npm test` (TS) + `npm run test:py` (Python) — 27 בדיקות.
+- [ ] auto-update (electron-updater) — לגרסה הבאה.
+- [ ] e2e מול OBS headless — לגרסה הבאה.
 
 ---
 

@@ -1,0 +1,24 @@
+appId: com.studiomaster.app
+productName: StudioMaster
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+# Bundle the Python editing workers next to the app (docs §6.4).
+extraResources:
+  - from: ../../services/ai-workers
+    to: ai-workers
+    filter:
+      - '**/*'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
