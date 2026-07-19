@@ -39,19 +39,18 @@
 
 ## Phase 2 — הקלטה מרובת-ערוצים (שבועות 4–5) — *דרישה 2*
 
-- [ ] אימות/הגדרת multi-track audio ב-OBS דרך websocket.
-- [ ] Mixer View: LED meters (InputVolumeMeters), בקרת עוצמה/mute per source.
+- [x] Mixer View: LED meters (InputVolumeMeters), בקרת עוצמה/mute per source, בורר סצנה.
+- [x] **PTZ Camera Control**: `ViscaIpController` (UDP :52381) ל-Minrray/OBSBOT + בוני VISCA
+      נבדקים ביחידה; לוח PTZ ב-UI (D-pad pan/tilt, zoom, 6 presets, בורר מצלמה).
+- [x] **Review Markers (Hotkey)**: `globalShortcut` (Ctrl+Shift+1–4) לפי קטגוריה → מסמך
+      `review.md` + `ReviewMarker` ב-SQLite, טיימקוד מ-`GetRecordStatus`; חיווי ויזואלי
+      ב-OBS דרך `flashSceneItem` (`SetSceneItemEnabled` על מקור "StudioMaster Marker").
+- [x] RecordingSession: נפתח אוטומטית עם תחילת ההקלטה, תיקיית per-session, cue תאורת record.
+- [ ] multi-track audio: אימות מיפוי tracks דרך websocket (הגדרה ידנית ב-OBS כרגע).
 - [ ] ערוצי וידאו נפרדים: אינטגרציה עם Source Record filter (או POC של plugin נקודתי).
-- [ ] Timeline recorder: תיעוד סצנות/דוברים/markers/מצלמות ל-SQLite במהלך ההקלטה.
-- [ ] ניהול קבצי פלט: מבנה תיקיות עקבי per-session.
-- [ ] **PTZ Camera Control**: `PtzController` + `ViscaIpBackend` (UDP :52381) ל-Minrray/OBSBOT;
-      לוח PTZ ב-UI (joystick pan/tilt, zoom, presets, בורר מצלמה). גשר `obs-ptz` כחלופה.
-- [ ] **Review Markers (Hotkey)**: `globalShortcut` לפי קטגוריה → מסמך טיימקודים
-      (`review.md`/`csv`) + `ReviewMarker` ב-SQLite, עם טיימקוד מ-`GetRecordStatus`;
-      חיווי ויזואלי ב-OBS (`SetSceneItemEnabled` overlay) בכל לחיצה.
 
-**Deliverable:** הקלטה שמפיקה קבצי שמע נפרדים + קובץ-לכל-מצלמה + תמהיל + timeline,
-עם שליטת PTZ מלאה מהממשק.
+**Deliverable:** ✅ מיקסר + שליטת PTZ מלאה + hotkey תיקונים עם חיווי ב-OBS, מהממשק.
+*(נותר להעמיק: מיפוי multi-track אוטומטי וקובץ-לכל-מצלמה — תלוי הגדרות OBS/פילטר.)*
 
 ---
 

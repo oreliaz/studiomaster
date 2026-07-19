@@ -9,6 +9,7 @@ const bundledWorkspaceDeps = [
   '@studiomaster/obs-controller',
   '@studiomaster/studio-launcher',
   '@studiomaster/lighting',
+  '@studiomaster/ptz-control',
 ]
 
 const alias = {
@@ -19,6 +20,7 @@ const alias = {
     '../../packages/studio-launcher/src/index.ts',
   ),
   '@studiomaster/lighting': resolve(__dirname, '../../packages/lighting/src/index.ts'),
+  '@studiomaster/ptz-control': resolve(__dirname, '../../packages/ptz-control/src/index.ts'),
 }
 
 export default defineConfig({

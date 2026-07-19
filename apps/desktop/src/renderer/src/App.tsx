@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { DashboardView } from './views/DashboardView.js'
+import { LiveView } from './views/LiveView.js'
 import { ProfilesView } from './views/ProfilesView.js'
 import { WizardView } from './views/WizardView.js'
 
-type View = 'wizard' | 'dashboard' | 'profiles'
+type View = 'wizard' | 'dashboard' | 'live' | 'profiles'
 
 const NAV: { id: View; label: string }[] = [
   { id: 'wizard', label: 'פתיחת אולפן' },
   { id: 'dashboard', label: 'הקלטה' },
+  { id: 'live', label: 'אולפן חי' },
   { id: 'profiles', label: 'אולפנים' },
 ]
 
@@ -31,6 +33,7 @@ export function App(): JSX.Element {
       <main className="main">
         {view === 'wizard' && <WizardView />}
         {view === 'dashboard' && <DashboardView />}
+        {view === 'live' && <LiveView />}
         {view === 'profiles' && <ProfilesView />}
       </main>
     </div>

@@ -4,6 +4,8 @@ import Database from 'better-sqlite3'
 import {
   studioProfileSchema,
   type ObsConnectionParams,
+  type ReviewMarker,
+  type ReviewMarkerCategory,
   type StudioProfile,
 } from '@studiomaster/shared'
 
@@ -40,6 +42,14 @@ const MIGRATIONS: string[] = [
      name TEXT NOT NULL,
      json TEXT NOT NULL
    );`,
+  `CREATE TABLE IF NOT EXISTS markers (
+     id         TEXT PRIMARY KEY,
+     session_id TEXT NOT NULL,
+     tc_ms      INTEGER NOT NULL,
+     category   TEXT NOT NULL,
+     note       TEXT,
+     created_at TEXT NOT NULL
+   );`,
 ]
 
 export interface Store {
@@ -51,6 +61,9 @@ export interface Store {
   getProfile(id: string): StudioProfile | null
   saveProfile(profile: StudioProfile): StudioProfile
   deleteProfile(id: string): void
+  addMarker(marker: ReviewMarker): void
+  listMarkers(sessionId?: string): ReviewMarker[]
+  updateMarkerNote(id: string, note: string): void
 }
 
 const OBS_CONNECTION_KEY = 'obs.connection'
@@ -122,12 +135,61 @@ class SqliteStore implements Store {
   deleteProfile(id: string): void {
     this.db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
   }
+
+  addMarker(marker: ReviewMarker): void {
+    this.db
+      .prepare(
+        'INSERT INTO markers (id, session_id, tc_ms, category, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        marker.id,
+        marker.sessionId,
+        marker.tcMs,
+        marker.category,
+        marker.note ?? null,
+        marker.createdAt,
+      )
+  }
+
+  listMarkers(sessionId?: string): ReviewMarker[] {
+    const rows = sessionId
+      ? (this.db
+          .prepare('SELECT * FROM markers WHERE session_id = ? ORDER BY tc_ms')
+          .all(sessionId) as MarkerRow[])
+      : (this.db.prepare('SELECT * FROM markers ORDER BY created_at').all() as MarkerRow[])
+    return rows.map(rowToMarker)
+  }
+
+  updateMarkerNote(id: string, note: string): void {
+    this.db.prepare('UPDATE markers SET note = ? WHERE id = ?').run(note, id)
+  }
+}
+
+interface MarkerRow {
+  id: string
+  session_id: string
+  tc_ms: number
+  category: string
+  note: string | null
+  created_at: string
+}
+
+function rowToMarker(r: MarkerRow): ReviewMarker {
+  return {
+    id: r.id,
+    sessionId: r.session_id,
+    tcMs: r.tc_ms,
+    category: r.category as ReviewMarkerCategory,
+    note: r.note ?? undefined,
+    createdAt: r.created_at,
+  }
 }
 
 /** Fallback used when the native SQLite module is unavailable. */
 class MemoryStore implements Store {
   private readonly settings = new Map<string, string>()
   private readonly profiles = new Map<string, StudioProfile>()
+  private readonly markers: ReviewMarker[] = []
 
   getSetting(key: string): string | null {
     return this.settings.get(key) ?? null
@@ -155,6 +217,17 @@ class MemoryStore implements Store {
   }
   deleteProfile(id: string): void {
     this.profiles.delete(id)
+  }
+  addMarker(marker: ReviewMarker): void {
+    this.markers.push(marker)
+  }
+  listMarkers(sessionId?: string): ReviewMarker[] {
+    const all = sessionId ? this.markers.filter((m) => m.sessionId === sessionId) : this.markers
+    return [...all].sort((a, b) => a.tcMs - b.tcMs)
+  }
+  updateMarkerNote(id: string, note: string): void {
+    const marker = this.markers.find((m) => m.id === id)
+    if (marker) marker.note = note
   }
 }
 

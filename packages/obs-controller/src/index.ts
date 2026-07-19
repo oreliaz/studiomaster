@@ -1,9 +1,12 @@
 import { EventEmitter } from 'node:events'
 import OBSWebSocket, { EventSubscription } from 'obs-websocket-js'
 import {
+  type InputLevel,
   type ObsConnectionParams,
   type ObsConnectionState,
+  type ObsInput,
   type ObsRecordState,
+  type ObsScene,
   timecodeToMs,
 } from '@studiomaster/shared'
 
@@ -19,6 +22,7 @@ import {
 export interface ObsControllerEvents {
   connection: (state: ObsConnectionState) => void
   record: (state: ObsRecordState) => void
+  levels: (levels: InputLevel[]) => void
 }
 
 export declare interface ObsController {
@@ -123,9 +127,91 @@ export class ObsController extends EventEmitter {
     return this.record
   }
 
+  // ─── mixer / scenes (docs §6.2) ──────────────────────────────────────────────
+
+  async listInputs(): Promise<ObsInput[]> {
+    const { inputs } = await this.obs.call('GetInputList')
+    const results: ObsInput[] = []
+    for (const input of inputs) {
+      const name = String(input.inputName)
+      try {
+        const [{ inputMuted }, { inputVolumeDb }] = await Promise.all([
+          this.obs.call('GetInputMute', { inputName: name }),
+          this.obs.call('GetInputVolume', { inputName: name }),
+        ])
+        results.push({
+          name,
+          kind: String(input.inputKind ?? ''),
+          muted: inputMuted,
+          volumeDb: inputVolumeDb,
+        })
+      } catch {
+        // Some inputs (e.g. images) have no audio; skip them.
+      }
+    }
+    return results
+  }
+
+  async setInputMute(inputName: string, muted: boolean): Promise<void> {
+    await this.obs.call('SetInputMute', { inputName, inputMuted: muted })
+  }
+
+  async setInputVolumeDb(inputName: string, db: number): Promise<void> {
+    await this.obs.call('SetInputVolume', { inputName, inputVolumeDb: db })
+  }
+
+  async listScenes(): Promise<{ scenes: ObsScene[]; current: string | null }> {
+    const data = await this.obs.call('GetSceneList')
+    const scenes = data.scenes
+      .map((s) => ({ name: String(s.sceneName), index: Number(s.sceneIndex) }))
+      .sort((a, b) => a.index - b.index)
+    return { scenes, current: data.currentProgramSceneName ?? null }
+  }
+
+  async setCurrentScene(name: string): Promise<void> {
+    await this.obs.call('SetCurrentProgramScene', { sceneName: name })
+  }
+
+  /**
+   * Briefly show a source overlay (e.g. "✓ marker") then hide it — the on-screen
+   * confirmation for review markers (docs §6.2.2). No-op if the source is absent.
+   */
+  async flashSceneItem(sceneName: string, sourceName: string, ms = 1200): Promise<void> {
+    try {
+      const { sceneItemId } = await this.obs.call('GetSceneItemId', { sceneName, sourceName })
+      await this.obs.call('SetSceneItemEnabled', {
+        sceneName,
+        sceneItemId,
+        sceneItemEnabled: true,
+      })
+      setTimeout(() => {
+        void this.obs
+          .call('SetSceneItemEnabled', { sceneName, sceneItemId, sceneItemEnabled: false })
+          .catch(() => undefined)
+      }, ms)
+    } catch {
+      // Overlay source not present in this scene — confirmation is best-effort.
+    }
+  }
+
+  async getCurrentSceneName(): Promise<string | null> {
+    const { currentProgramSceneName } = await this.obs.call('GetSceneList')
+    return currentProgramSceneName ?? null
+  }
+
   // ─── internals ─────────────────────────────────────────────────────────────
 
   private registerObsEvents(): void {
+    this.obs.on('InputVolumeMeters', (data: { inputs: unknown[] }) => {
+      const levels: InputLevel[] = data.inputs.map((raw) => {
+        const input = raw as { inputName: string; inputLevelsMul?: number[][] }
+        const channels = input.inputLevelsMul ?? []
+        const peak = channels.map((ch) => (ch.length > 0 ? Math.max(...ch) : 0))
+        return { name: input.inputName, peak }
+      })
+      this.emit('levels', levels)
+    })
+
     this.obs.on('RecordStateChanged', (data) => {
       // OBS gives us the authoritative active flag here; timecode via poll.
       const active = data.outputActive

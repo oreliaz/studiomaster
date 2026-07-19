@@ -1,15 +1,14 @@
-# packages/ptz-control
+# @studiomaster/ptz-control
 
 שליטת מצלמות PTZ מהממשק — Minrray ו-OBSBOT (Tail Air) מעל **VISCA-over-IP** (UDP :52381).
 
-## API מתוכנן
-- `PtzController.move(camId, {pan, tilt, speed})` — pan/tilt רציף כל עוד לחוץ.
-- `PtzController.zoom(camId, dir)` / `stop(camId)`.
-- `PtzController.recallPreset(camId, n)` / `storePreset(camId, n)`.
+## API
+- `createPtzController(cameras)` → `PtzController` (או `null` אם אין מצלמות VISCA-over-IP).
+- `PtzController`: `move()` / `stopMove()` / `zoom()` / `recallPreset()` / `storePreset()` / `cameras()`.
+- `ViscaIpController` — מימוש UDP; מנהל sequence number לכל מצלמה.
+- בוני פקודות VISCA טהורים (`visca.ts`): `panTiltCommand`, `zoomCommand`,
+  `presetRecallCommand`, `presetStoreCommand`, `viscaOverIp` — נבדקים ביחידה (`npm test`).
 
-## Backends (מאחורי interface אחיד)
-- **`ViscaIpBackend`** (ברירת מחדל) — client VISCA-over-IP ישיר, StudioMaster בעל החיבור.
-- **`ObsPtzBridgeBackend`** (חלופי) — ניתוב דרך תוסף `obs-ptz` הקיים (obs-websocket vendor),
-  למניעת קונפליקט החיבור-היחיד של VISCA-over-IP.
-
-מיושם ב-Phase 2. ראה [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) §6.2.1.
+## אילוץ (ADR-006)
+VISCA-over-IP מאפשר **בעל-חיבור יחיד** למצלמה בו-זמנית. אם תוסף `obs-ptz` מחובר לאותה
+מצלמה מאותו host — StudioMaster לא יתחבר במקביל. גשר `obs-ptz` יתווסף מאחורי אותו interface.

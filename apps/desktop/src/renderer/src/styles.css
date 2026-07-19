@@ -457,6 +457,179 @@ body {
   }
 }
 
+/* ── mixer ── */
+.mixer-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mixer-row__head {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mixer-row__name {
+  font-weight: 600;
+}
+
+.mixer-row__db {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+  direction: ltr;
+  text-align: end;
+}
+
+.mixer-row input[type='range'] {
+  width: 100%;
+}
+
+.meter {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: #0d0f14;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.meter__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--ok), var(--warn) 75%, var(--record));
+  transition: width 0.08s linear;
+}
+
+/* ── ptz ── */
+.ptz {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 52px);
+  gap: 6px;
+}
+
+.dpad__btn {
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dpad__btn:hover {
+  border-color: var(--primary);
+}
+
+.ptz__zoom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preset {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+/* ── markers ── */
+.marker-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.marker-buttons .btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.marker-buttons__hk {
+  font-size: 10px;
+  color: var(--muted);
+  direction: ltr;
+}
+
+.marker-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.marker-list li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.marker-list__tc {
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  color: var(--muted);
+}
+
+.marker-list__cat {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.cat--fix {
+  color: var(--record);
+  border-color: var(--record);
+}
+.cat--highlight {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+.cat--chapter {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.card--flash {
+  animation: flash 0.6s ease;
+}
+
+@keyframes flash {
+  0% {
+    border-color: var(--ok);
+    box-shadow: 0 0 0 2px var(--ok);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+
 /* ── misc ── */
 .hint {
   color: var(--muted);

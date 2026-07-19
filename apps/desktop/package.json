@@ -16,6 +16,7 @@
   "dependencies": {
     "@studiomaster/lighting": "*",
     "@studiomaster/obs-controller": "*",
+    "@studiomaster/ptz-control": "*",
     "@studiomaster/shared": "*",
     "@studiomaster/studio-launcher": "*",
     "better-sqlite3": "^11.3.0",

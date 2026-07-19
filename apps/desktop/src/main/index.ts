@@ -1,32 +1,99 @@
 import { join } from 'node:path'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { ObsController } from '@studiomaster/obs-controller'
+import { createPtzController, type PtzController } from '@studiomaster/ptz-control'
+import { createLightingAdapter } from '@studiomaster/lighting'
 import {
   IPC_EVENTS,
+  type InputLevel,
   type ObsConnectionParams,
   type ObsConnectionState,
   type ObsRecordState,
+  type PtzMoveCommand,
+  type PtzPresetCommand,
+  type PtzZoomCommand,
+  type ReviewMarkerCategory,
   type StudioProfile,
   type WizardState,
 } from '@studiomaster/shared'
 import { createStore } from './store.js'
 import { WizardOrchestrator } from './wizard.js'
+import { RecordingSessionManager } from './session.js'
+
+/** Convention: add a source with this name to the scene for on-screen marker confirmation. */
+const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
+const ACTIVE_PROFILE_KEY = 'active.profile'
 
 const store = createStore()
 const obs = new ObsController()
+const session = new RecordingSessionManager(store)
 const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVENTS.wizard, state))
 
+let ptzController: PtzController | null = null
+let ptzProfileId: string | null | undefined = undefined
+
 function broadcast<T>(channel: string, payload: T): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send(channel, payload)
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
+}
+
+function activeProfile(): StudioProfile | null {
+  const id = store.getSetting(ACTIVE_PROFILE_KEY)
+  return id ? store.getProfile(id) : null
+}
+
+/** Rebuild the PTZ controller lazily when the active profile changes. */
+function getPtz(): PtzController | null {
+  const id = store.getSetting(ACTIVE_PROFILE_KEY)
+  if (id !== ptzProfileId) {
+    ptzController?.dispose()
+    ptzController = null
+    ptzProfileId = id
+    const profile = id ? store.getProfile(id) : null
+    if (profile) ptzController = createPtzController(profile.cameras)
+  }
+  return ptzController
+}
+
+// ── OBS state → renderer + session lifecycle ──
+obs.on('connection', (state: ObsConnectionState) => broadcast(IPC_EVENTS.obsConnection, state))
+obs.on('levels', (levels: InputLevel[]) => broadcast(IPC_EVENTS.mixerLevels, levels))
+obs.on('record', (state: ObsRecordState) => {
+  broadcast(IPC_EVENTS.obsRecord, state)
+  if (state.active && !session.session) {
+    session.start()
+    applyRecordLighting()
+  } else if (!state.active && session.session) {
+    session.end()
+  }
+})
+
+function applyRecordLighting(): void {
+  const profile = activeProfile()
+  const cue = profile?.lighting?.cues?.['record']
+  if (!profile || !cue) return
+  try {
+    createLightingAdapter(profile.lighting)
+      ?.setCue(cue)
+      .catch((err) => console.warn('[lighting] record cue failed:', err))
+  } catch (err) {
+    console.warn('[lighting] adapter unavailable:', err)
   }
 }
 
-// Push OBS state changes to every renderer window.
-obs.on('connection', (state: ObsConnectionState) => broadcast(IPC_EVENTS.obsConnection, state))
-obs.on('record', (state: ObsRecordState) => broadcast(IPC_EVENTS.obsRecord, state))
+/** Drop a review marker at the current OBS timecode + flash the on-screen overlay. */
+function addMarker(category: ReviewMarkerCategory, note?: string) {
+  const rec = obs.getRecordState()
+  const marker = session.addMarker(category, rec.timecodeMs, note)
+  if (!marker) return null
+  void obs.getCurrentSceneName().then((scene) => {
+    if (scene) void obs.flashSceneItem(scene, MARKER_OVERLAY_SOURCE)
+  })
+  broadcast(IPC_EVENTS.markerAdded, marker)
+  return marker
+}
 
 function registerIpc(): void {
+  // OBS
   ipcMain.handle('obs:connect', async (_e, params: ObsConnectionParams) => {
     const state = await obs.connect(params)
     if (state.status === 'connected') store.saveConnection(params)
@@ -40,19 +107,20 @@ function registerIpc(): void {
   ipcMain.handle('obs:get-record-state', () => obs.getRecordState())
   ipcMain.handle('obs:get-saved-connection', () => store.getSavedConnection())
 
-  // Studio profiles (requirement 1).
+  // Profiles
   ipcMain.handle('profiles:list', () => store.listProfiles())
   ipcMain.handle('profiles:get', (_e, id: string) => store.getProfile(id))
   ipcMain.handle('profiles:save', (_e, profile: StudioProfile) => store.saveProfile(profile))
   ipcMain.handle('profiles:remove', (_e, id: string) => store.deleteProfile(id))
 
-  // Opening wizard.
+  // Wizard
   ipcMain.handle('wizard:start', async (_e, profileId: string) => {
     const profile = store.getProfile(profileId)
     if (!profile) {
       wizard.reset()
       return { ...wizard.getState(), phase: 'failed', error: 'הפרופיל לא נמצא' } as WizardState
     }
+    store.setSetting(ACTIVE_PROFILE_KEY, profileId)
     return wizard.start(profile)
   })
   ipcMain.handle('wizard:get-state', () => wizard.getState())
@@ -61,14 +129,56 @@ function registerIpc(): void {
   )
   ipcMain.handle('wizard:finish-checklist', () => wizard.finishChecklist())
   ipcMain.handle('wizard:reset', () => wizard.reset())
+
+  // Mixer
+  ipcMain.handle('mixer:list-inputs', () => obs.listInputs())
+  ipcMain.handle('mixer:set-mute', (_e, name: string, muted: boolean) =>
+    obs.setInputMute(name, muted),
+  )
+  ipcMain.handle('mixer:set-volume', (_e, name: string, db: number) =>
+    obs.setInputVolumeDb(name, db),
+  )
+  ipcMain.handle('mixer:list-scenes', () => obs.listScenes())
+  ipcMain.handle('mixer:set-scene', (_e, name: string) => obs.setCurrentScene(name))
+
+  // PTZ
+  ipcMain.handle('ptz:move', (_e, cmd: PtzMoveCommand) => getPtz()?.move(cmd) ?? undefined)
+  ipcMain.handle('ptz:stop', (_e, cameraId: string) => getPtz()?.stopMove(cameraId) ?? undefined)
+  ipcMain.handle('ptz:zoom', (_e, cmd: PtzZoomCommand) => getPtz()?.zoom(cmd) ?? undefined)
+  ipcMain.handle('ptz:recall-preset', (_e, cmd: PtzPresetCommand) => getPtz()?.recallPreset(cmd))
+  ipcMain.handle('ptz:store-preset', (_e, cmd: PtzPresetCommand) => getPtz()?.storePreset(cmd))
+  ipcMain.handle('ptz:list-cameras', () => getPtz()?.cameras() ?? [])
+
+  // Markers
+  ipcMain.handle('markers:add', (_e, category: ReviewMarkerCategory, note?: string) =>
+    addMarker(category, note),
+  )
+  ipcMain.handle('markers:list', () => store.listMarkers(session.session?.id))
+  ipcMain.handle('markers:update-note', (_e, id: string, note: string) =>
+    store.updateMarkerNote(id, note),
+  )
+}
+
+/** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */
+function registerHotkeys(): void {
+  const map: Record<string, ReviewMarkerCategory> = {
+    'CommandOrControl+Shift+1': 'fix',
+    'CommandOrControl+Shift+2': 'highlight',
+    'CommandOrControl+Shift+3': 'chapter',
+    'CommandOrControl+Shift+4': 'note',
+  }
+  for (const [accel, category] of Object.entries(map)) {
+    const ok = globalShortcut.register(accel, () => addMarker(category))
+    if (!ok) console.warn(`[hotkey] failed to register ${accel}`)
+  }
 }
 
 function createWindow(): void {
   const window = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    minWidth: 900,
-    minHeight: 600,
+    width: 1180,
+    height: 780,
+    minWidth: 960,
+    minHeight: 640,
     show: false,
     backgroundColor: '#0f1115',
     title: 'StudioMaster',
@@ -81,7 +191,6 @@ function createWindow(): void {
   })
 
   window.on('ready-to-show', () => window.show())
-
   window.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
     return { action: 'deny' }
@@ -95,7 +204,13 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Default the active profile to the first one that has cameras, if unset.
+  if (!store.getSetting(ACTIVE_PROFILE_KEY)) {
+    const withCams = store.listProfiles().find((p) => p.cameras.length > 0)
+    if (withCams) store.setSetting(ACTIVE_PROFILE_KEY, withCams.id)
+  }
   registerIpc()
+  registerHotkeys()
   createWindow()
 
   app.on('activate', () => {
@@ -103,7 +218,10 @@ app.whenReady().then(() => {
   })
 })
 
+app.on('will-quit', () => globalShortcut.unregisterAll())
+
 app.on('window-all-closed', () => {
+  ptzController?.dispose()
   void obs.disconnect().catch(() => undefined)
   if (process.platform !== 'darwin') app.quit()
 })
