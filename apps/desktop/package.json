@@ -14,8 +14,10 @@
     "rebuild": "electron-rebuild -f -w better-sqlite3"
   },
   "dependencies": {
+    "@studiomaster/lighting": "*",
     "@studiomaster/obs-controller": "*",
     "@studiomaster/shared": "*",
+    "@studiomaster/studio-launcher": "*",
     "better-sqlite3": "^11.3.0",
     "obs-websocket-js": "^5.0.6",
     "zod": "^3.23.8"

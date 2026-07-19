@@ -4,11 +4,21 @@ import react from '@vitejs/plugin-react'
 
 // Workspace packages are consumed as TypeScript source and must be bundled,
 // so they are excluded from dependency externalization.
-const bundledWorkspaceDeps = ['@studiomaster/shared', '@studiomaster/obs-controller']
+const bundledWorkspaceDeps = [
+  '@studiomaster/shared',
+  '@studiomaster/obs-controller',
+  '@studiomaster/studio-launcher',
+  '@studiomaster/lighting',
+]
 
 const alias = {
   '@studiomaster/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
   '@studiomaster/obs-controller': resolve(__dirname, '../../packages/obs-controller/src/index.ts'),
+  '@studiomaster/studio-launcher': resolve(
+    __dirname,
+    '../../packages/studio-launcher/src/index.ts',
+  ),
+  '@studiomaster/lighting': resolve(__dirname, '../../packages/lighting/src/index.ts'),
 }
 
 export default defineConfig({

@@ -18,10 +18,11 @@ export const programSchema = z.object({
   /** How to know the program is ready before moving on. */
   waitFor: z
     .union([
-      z.literal('spawn'), // process handle exists
-      z.string().regex(/^window:/), // e.g. "window:QLC+"
-      z.string().regex(/^port:\d+$/), // e.g. "port:4455"
-      z.literal('websocket'), // OBS obs-websocket reachable
+      z.literal('spawn'), // resolve once the process is spawned
+      z.literal('websocket'), // OBS obs-websocket reachable (port 4455)
+      z.string().regex(/^delay:\d+$/), // fixed wait, e.g. "delay:3000" (ms)
+      z.string().regex(/^port:\d+$/), // TCP port reachable, e.g. "port:3332"
+      z.string().regex(/^window:.+/), // process/window present, e.g. "window:FreeStyler"
     ])
     .default('spawn'),
   required: z.boolean().default(false),

@@ -6,11 +6,15 @@ import {
   type ObsConnectionParams,
   type ObsConnectionState,
   type ObsRecordState,
+  type StudioProfile,
+  type WizardState,
 } from '@studiomaster/shared'
 import { createStore } from './store.js'
+import { WizardOrchestrator } from './wizard.js'
 
 const store = createStore()
 const obs = new ObsController()
+const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVENTS.wizard, state))
 
 function broadcast<T>(channel: string, payload: T): void {
   for (const win of BrowserWindow.getAllWindows()) {
@@ -35,6 +39,28 @@ function registerIpc(): void {
   ipcMain.handle('obs:toggle-record', () => obs.toggleRecord())
   ipcMain.handle('obs:get-record-state', () => obs.getRecordState())
   ipcMain.handle('obs:get-saved-connection', () => store.getSavedConnection())
+
+  // Studio profiles (requirement 1).
+  ipcMain.handle('profiles:list', () => store.listProfiles())
+  ipcMain.handle('profiles:get', (_e, id: string) => store.getProfile(id))
+  ipcMain.handle('profiles:save', (_e, profile: StudioProfile) => store.saveProfile(profile))
+  ipcMain.handle('profiles:remove', (_e, id: string) => store.deleteProfile(id))
+
+  // Opening wizard.
+  ipcMain.handle('wizard:start', async (_e, profileId: string) => {
+    const profile = store.getProfile(profileId)
+    if (!profile) {
+      wizard.reset()
+      return { ...wizard.getState(), phase: 'failed', error: 'הפרופיל לא נמצא' } as WizardState
+    }
+    return wizard.start(profile)
+  })
+  ipcMain.handle('wizard:get-state', () => wizard.getState())
+  ipcMain.handle('wizard:set-checklist-item', (_e, index: number, done: boolean) =>
+    wizard.setChecklistItem(index, done),
+  )
+  ipcMain.handle('wizard:finish-checklist', () => wizard.finishChecklist())
+  ipcMain.handle('wizard:reset', () => wizard.reset())
 }
 
 function createWindow(): void {

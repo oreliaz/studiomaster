@@ -4,4 +4,5 @@
  */
 export * from './model.js'
 export * from './obs.js'
+export * from './wizard.js'
 export * from './ipc.js'

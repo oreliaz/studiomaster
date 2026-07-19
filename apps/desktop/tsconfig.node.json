@@ -7,7 +7,9 @@
     "types": ["node", "electron-vite/node"],
     "paths": {
       "@studiomaster/shared": ["../../packages/shared/src/index.ts"],
-      "@studiomaster/obs-controller": ["../../packages/obs-controller/src/index.ts"]
+      "@studiomaster/obs-controller": ["../../packages/obs-controller/src/index.ts"],
+      "@studiomaster/studio-launcher": ["../../packages/studio-launcher/src/index.ts"],
+      "@studiomaster/lighting": ["../../packages/lighting/src/index.ts"]
     }
   },
   "include": [
@@ -15,6 +17,8 @@
     "src/preload/**/*.ts",
     "electron.vite.config.ts",
     "../../packages/shared/src/**/*.ts",
-    "../../packages/obs-controller/src/**/*.ts"
+    "../../packages/obs-controller/src/**/*.ts",
+    "../../packages/studio-launcher/src/**/*.ts",
+    "../../packages/lighting/src/**/*.ts"
   ]
 }

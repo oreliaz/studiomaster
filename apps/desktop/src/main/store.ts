@@ -1,18 +1,24 @@
 import { join } from 'node:path'
 import { app } from 'electron'
 import Database from 'better-sqlite3'
-import type { ObsConnectionParams } from '@studiomaster/shared'
+import {
+  studioProfileSchema,
+  type ObsConnectionParams,
+  type StudioProfile,
+} from '@studiomaster/shared'
 
 /**
- * Local persistence (docs/ARCHITECTURE.md §7). Phase 0 keeps this intentionally
- * small: a key/value settings table plus the sessions table that later phases
- * build on. SQLite is a native module; if it fails to load (e.g. not rebuilt
- * for the current Electron ABI) the app degrades to an in-memory store rather
- * than crashing, so the OBS control surface still works.
+ * Local persistence (docs/ARCHITECTURE.md §7). Phase 1 adds studio profiles on
+ * top of the Phase 0 settings store. SQLite is a native module; if it fails to
+ * load (e.g. not rebuilt for the current Electron ABI) the app degrades to an
+ * in-memory store rather than crashing, so the rest of the app still works.
  */
 
 interface SettingsRow {
   value: string
+}
+interface ProfileRow {
+  json: string
 }
 
 const MIGRATIONS: string[] = [
@@ -29,6 +35,11 @@ const MIGRATIONS: string[] = [
      ended_at      TEXT,
      storage_path  TEXT
    );`,
+  `CREATE TABLE IF NOT EXISTS profiles (
+     id   TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     json TEXT NOT NULL
+   );`,
 ]
 
 export interface Store {
@@ -36,9 +47,22 @@ export interface Store {
   setSetting(key: string, value: string): void
   getSavedConnection(): ObsConnectionParams | null
   saveConnection(params: ObsConnectionParams): void
+  listProfiles(): StudioProfile[]
+  getProfile(id: string): StudioProfile | null
+  saveProfile(profile: StudioProfile): StudioProfile
+  deleteProfile(id: string): void
 }
 
 const OBS_CONNECTION_KEY = 'obs.connection'
+
+/** Parse + validate a stored profile; returns null if it no longer matches. */
+function parseProfile(json: string): StudioProfile | null {
+  try {
+    return studioProfileSchema.parse(JSON.parse(json))
+  } catch {
+    return null
+  }
+}
 
 class SqliteStore implements Store {
   constructor(private readonly db: Database.Database) {
@@ -73,16 +97,43 @@ class SqliteStore implements Store {
   saveConnection(params: ObsConnectionParams): void {
     this.setSetting(OBS_CONNECTION_KEY, JSON.stringify(params))
   }
+
+  listProfiles(): StudioProfile[] {
+    const rows = this.db.prepare('SELECT json FROM profiles ORDER BY name').all() as ProfileRow[]
+    return rows.map((r) => parseProfile(r.json)).filter((p): p is StudioProfile => p !== null)
+  }
+
+  getProfile(id: string): StudioProfile | null {
+    const row = this.db.prepare('SELECT json FROM profiles WHERE id = ?').get(id) as
+      ProfileRow | undefined
+    return row ? parseProfile(row.json) : null
+  }
+
+  saveProfile(profile: StudioProfile): StudioProfile {
+    const validated = studioProfileSchema.parse(profile)
+    this.db
+      .prepare(
+        'INSERT INTO profiles (id, name, json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, json = excluded.json',
+      )
+      .run(validated.id, validated.name, JSON.stringify(validated))
+    return validated
+  }
+
+  deleteProfile(id: string): void {
+    this.db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
+  }
 }
 
 /** Fallback used when the native SQLite module is unavailable. */
 class MemoryStore implements Store {
-  private readonly map = new Map<string, string>()
+  private readonly settings = new Map<string, string>()
+  private readonly profiles = new Map<string, StudioProfile>()
+
   getSetting(key: string): string | null {
-    return this.map.get(key) ?? null
+    return this.settings.get(key) ?? null
   }
   setSetting(key: string, value: string): void {
-    this.map.set(key, value)
+    this.settings.set(key, value)
   }
   getSavedConnection(): ObsConnectionParams | null {
     const raw = this.getSetting(OBS_CONNECTION_KEY)
@@ -90,6 +141,20 @@ class MemoryStore implements Store {
   }
   saveConnection(params: ObsConnectionParams): void {
     this.setSetting(OBS_CONNECTION_KEY, JSON.stringify(params))
+  }
+  listProfiles(): StudioProfile[] {
+    return [...this.profiles.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  getProfile(id: string): StudioProfile | null {
+    return this.profiles.get(id) ?? null
+  }
+  saveProfile(profile: StudioProfile): StudioProfile {
+    const validated = studioProfileSchema.parse(profile)
+    this.profiles.set(validated.id, validated)
+    return validated
+  }
+  deleteProfile(id: string): void {
+    this.profiles.delete(id)
   }
 }
 

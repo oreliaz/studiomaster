@@ -22,14 +22,18 @@
 
 ## Phase 1 — אשף פתיחת אולפן (שבועות 2–3) — *דרישה 1*
 
-- [ ] מודל `StudioProfile` + עורך פרופילים ב-UI.
-- [ ] Studio Launcher: הפעלת תוכנות (`spawn`) + `waitFor` (window/port/process).
-- [ ] Lighting Adapters: interface `LightingAdapter` + מימוש **FreeStyler** (HTTP ל-webserver
-      פורט 3332, עם MIDI כחלופה). אימות פורמט פקודת button/cue מול הוויקי הרשמי.
-- [ ] Onboarding State Machine: `IDLE→LAUNCHING→CONNECTING_OBS→LIGHTING→CHECKLIST→AUDIO_CHECK→READY`.
-- [ ] UI אשף מודרך: צעד-אחר-צעד, בדיקות אוטומטיות + אישורים ידניים.
+- [x] מודל `StudioProfile` + עורך פרופילים ב-UI (בחירת תוכנות, סדר פתיחה, checklist, תאורה).
+- [x] Studio Launcher: הפעלת תוכנות (`spawn`) + `waitFor` (`spawn`/`websocket`/`delay`/`port`/`window`),
+      עצירה על כשל תוכנה חיונית. side effects מבודדים → נבדק ביחידה (6 בדיקות עוברות).
+- [x] Lighting Adapters: interface `LightingAdapter` + מימוש **FreeStyler** (HTTP ל-webserver
+      פורט 3332). אדפטרים נוספים מאחורי אותו interface. *(פורמט button/cue מדויק — לאימות בשטח.)*
+- [x] Onboarding orchestrator: `idle→launching→lighting→checklist→ready` (עם `failed`), state מוזרם ל-UI.
+- [x] UI אשף מודרך: בחירת אולפן → רצף פתיחה עם סטטוס לכל שלב → checklist → "מוכן".
 
-**Deliverable:** לחיצה אחת מעלה את האולפן ומדריכה עד "מוכן להקלטה".
+**Deliverable:** ✅ לחיצה אחת מעלה את האולפן (תוכנות לפי סדר + תאורת standby) ומדריכה עד "מוכן להקלטה".
+
+> **פערים ל-Phase 2:** שילוב `CONNECTING_OBS` ו-`AUDIO_CHECK` לתוך הרצף (תלוי בבקרת ההקלטה),
+> וזיהוי חלון אמין יותר (כרגע `window:` הוא התאמת שם-תהליך best-effort דרך tasklist).
 
 ---
 

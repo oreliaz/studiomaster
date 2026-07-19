@@ -28,6 +28,8 @@ StudioMaster מנהלת את מחזור החיים המלא של הקלטת או
 ```
 apps/desktop/          Electron + React + TypeScript — ה-UI וה-orchestrator
 packages/obs-controller/  עטיפה ל-obs-websocket-js
+packages/studio-launcher/ פתיחת תוכנות האולפן לפי סדר + בדיקות מוכנות
+packages/lighting/     בקרת תאורה (FreeStyler) מאחורי interface אחיד
 packages/ptz-control/  שליטת מצלמות PTZ (VISCA-over-IP) — Minrray / OBSBOT
 packages/shared/       טיפוסים ולוגיקה משותפים
 services/ai-workers/   Python — סוכני עריכה (ffmpeg, whisper, Claude)

@@ -1,6 +1,7 @@
 :root {
   --bg: #0f1115;
   --card: #171a21;
+  --card-2: #1e222b;
   --border: #262b36;
   --text: #e7ebf2;
   --muted: #8b93a4;
@@ -21,26 +22,71 @@ body {
   color: var(--text);
 }
 
-.app {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 20px 40px;
+/* ── shell / nav ── */
+.shell {
   display: flex;
-  flex-direction: column;
-  gap: 20px;
+  min-height: 100vh;
 }
 
-.app__header {
+.nav {
+  width: 200px;
+  flex-shrink: 0;
+  background: #0c0e12;
+  border-inline-start: 1px solid var(--border);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav__brand {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 12px 18px;
+}
+
+.nav__item {
+  text-align: start;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.nav__item:hover {
+  background: var(--card);
+  color: var(--text);
+}
+
+.nav__item.is-active {
+  background: var(--card-2);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.main {
+  flex: 1;
+  padding: 24px 28px 48px;
+  overflow-y: auto;
+  max-width: 860px;
+}
+
+/* ── headers / cards ── */
+.view__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 18px;
 }
 
-.app__header h1 {
+.view__header h1 {
   margin: 0;
   font-size: 22px;
-  letter-spacing: 0.02em;
 }
 
 .card {
@@ -48,17 +94,37 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+  margin-bottom: 18px;
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
 .card h2 {
   margin: 0 0 16px;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
+.card__head h2 {
+  margin: 0;
+}
+
+.card--success {
+  border-color: var(--ok);
+}
+.card--error {
+  border-color: var(--record);
+}
+
+/* ── fields ── */
 .field {
   margin-bottom: 14px;
   display: flex;
@@ -71,23 +137,42 @@ body {
   color: var(--muted);
 }
 
-.field input {
+.field input,
+.field select,
+.row input {
   background: #0d0f14;
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
   color: var(--text);
   font-size: 14px;
+  width: 100%;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   outline: none;
   border-color: var(--primary);
 }
 
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* ── buttons ── */
 .actions {
   display: flex;
   gap: 10px;
+  align-items: center;
   margin-top: 6px;
 }
 
@@ -116,6 +201,27 @@ body {
   border-color: var(--primary);
 }
 
+.btn--danger {
+  background: #7f1d1d;
+  border-color: var(--record);
+}
+
+.btn--small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.btn--big {
+  padding: 14px 26px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.btn--icon {
+  padding: 6px 10px;
+  line-height: 1;
+}
+
 .btn--record {
   background: var(--record);
   border-color: var(--record);
@@ -125,9 +231,9 @@ body {
 
 .btn--record.is-recording {
   background: #7f1d1d;
-  border-color: var(--record);
 }
 
+/* ── badges ── */
 .badge {
   font-size: 12px;
   padding: 5px 12px;
@@ -136,21 +242,25 @@ body {
   color: var(--muted);
 }
 
-.badge--connected {
+.badge--connected,
+.badge--phase-ready {
   color: var(--ok);
   border-color: var(--ok);
 }
-
-.badge--connecting {
+.badge--connecting,
+.badge--phase-launching,
+.badge--phase-lighting,
+.badge--phase-checklist {
   color: var(--warn);
   border-color: var(--warn);
 }
-
-.badge--error {
+.badge--error,
+.badge--phase-failed {
   color: var(--record);
   border-color: var(--record);
 }
 
+/* ── timecode ── */
 .timecode {
   display: flex;
   align-items: center;
@@ -158,7 +268,6 @@ body {
   font-variant-numeric: tabular-nums;
   font-size: 40px;
   font-weight: 300;
-  letter-spacing: 0.02em;
   margin-bottom: 12px;
   direction: ltr;
 }
@@ -189,6 +298,166 @@ body {
   }
 }
 
+/* ── profiles split ── */
+.split {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.list__item.is-active {
+  border-color: var(--primary);
+}
+
+.list__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.editor--empty {
+  padding: 40px;
+  text-align: center;
+}
+
+.editor__footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ── program row ── */
+.program {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.program__order {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.program__num {
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.program__fields {
+  flex: 1;
+}
+
+.program__remove {
+  color: var(--record);
+}
+
+/* ── switches / checks ── */
+.switch,
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.check {
+  margin-top: 8px;
+  color: var(--text);
+}
+
+/* ── steps / checklist ── */
+.steps,
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+}
+
+.step__icon {
+  width: 22px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.step--ok .step__icon {
+  color: var(--ok);
+}
+.step--failed .step__icon,
+.step--failed .step__detail {
+  color: var(--record);
+}
+.step--running .step__icon {
+  color: var(--warn);
+}
+.step--skipped {
+  opacity: 0.5;
+}
+
+.step__label {
+  flex: 1;
+}
+
+.step__req {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.step__detail {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.is-spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── misc ── */
 .hint {
   color: var(--muted);
   font-size: 13px;
