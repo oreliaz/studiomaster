@@ -3,6 +3,7 @@ import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
 import type { CalendarEvent, GoogleAuthStatus, SessionSummary, UploadProgress } from './cloud.js'
+import type { AiJobResult } from './ai.js'
 import type { WizardState } from './wizard.js'
 
 /**
@@ -77,6 +78,10 @@ export interface StudioMasterApi {
     recognizeSession(sessionId: string): Promise<SessionSummary | null>
     /** Upload all files in a session's folder to Drive (progress via event). */
     uploadSession(sessionId: string): Promise<SessionSummary | null>
+  }
+  ai: {
+    /** Run the autonomous editing pipeline over a recording session. */
+    processSession(sessionId: string): Promise<AiJobResult>
   }
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void
   onRecordState(cb: (state: ObsRecordState) => void): () => void

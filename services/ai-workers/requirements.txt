@@ -1,0 +1,4 @@
+# Optional heavy deps — the pipeline degrades gracefully without them.
+faster-whisper>=1.0.0   # local transcription (+ diarization)
+anthropic>=0.40.0       # Claude EDL planning (needs ANTHROPIC_API_KEY)
+# System dependency (not pip): ffmpeg + ffprobe on PATH for rendering.

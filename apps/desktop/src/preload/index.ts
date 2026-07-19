@@ -79,6 +79,9 @@ const api: StudioMasterApi = {
     recognizeSession: (id: string) => ipcRenderer.invoke('cloud:recognize-session', id),
     uploadSession: (id: string) => ipcRenderer.invoke('cloud:upload-session', id),
   },
+  ai: {
+    processSession: (id: string) => ipcRenderer.invoke('ai:process-session', id),
+  },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),
   onRecordState: (cb: (state: ObsRecordState) => void) => subscribe(IPC_EVENTS.obsRecord, cb),

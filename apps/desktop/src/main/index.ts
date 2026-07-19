@@ -21,6 +21,7 @@ import { createStore } from './store.js'
 import { WizardOrchestrator } from './wizard.js'
 import { RecordingSessionManager } from './session.js'
 import { CloudService } from './cloud.js'
+import { AiEditor } from './ai.js'
 
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
@@ -33,6 +34,7 @@ const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVEN
 const cloud = new CloudService(store, (p: UploadProgress) =>
   broadcast(IPC_EVENTS.uploadProgress, p),
 )
+const ai = new AiEditor(store)
 
 let ptzController: PtzController | null = null
 let ptzProfileId: string | null | undefined = undefined
@@ -177,6 +179,9 @@ function registerIpc(): void {
   ipcMain.handle('cloud:list-sessions', () => cloud.listSessions())
   ipcMain.handle('cloud:recognize-session', (_e, id: string) => cloud.recognizeSession(id))
   ipcMain.handle('cloud:upload-session', (_e, id: string) => cloud.uploadSession(id))
+
+  // AI editing agents
+  ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))
 }
 
 /** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */

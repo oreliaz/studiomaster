@@ -1,14 +1,32 @@
 # services/ai-workers
 
-סוכני העריכה האוטונומיים (Python). צורכים job מהתור ומריצים את ה-pipeline:
+סוכני העריכה האוטונומיים (Python). צורכים תיקיית session ומריצים את ה-pipeline:
 
 ```
-Ingest → Transcribe → Analyze → Plan(EDL) → Render → QA → Deliver
+ingest → transcribe → analyze → plan (EDL) → render → deliver
 ```
 
-## תלויות עיקריות (מתוכננות)
-- `ffmpeg` — חיתוך, render, מיזוג ערוצי שמע, 9:16.
-- `faster-whisper` — תמלול + timestamps + diarization (מקומי).
-- Claude API — הבנת תוכן והפקת Edit Decision List מתוך Deliverable Template.
+## הרצה
+```bash
+python -m ai_workers.worker <session_dir> [--dry-run] [--highlights N]
+```
+ה-worker קורא `markers.json` + מדיה מהתיקייה, וכותב תוצרים ל-`<session_dir>/edited/`:
+`edl.json`, `transcript.txt`, `chapters.txt`, `full_edit.mp4`, `highlight_N.mp4`, `short_N.mp4`.
 
-מיושם ב-Phase 4. ראה [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) §6.4.
+האפליקציה מריצה אותו אוטומטית מלשונית "ענן" (כפתור **ערוך אוטומטית**), לאחר שהיא
+מייצאת את `markers.json` ו-`session.json` לתיקיית ה-session.
+
+## עמידות (graceful degradation)
+- **בלי `faster-whisper`** → מדלג על תמלול (עריכה לפי סמנים בלבד).
+- **בלי `ANTHROPIC_API_KEY`/`anthropic`** → EDL דטרמיניסטי מהסמנים (`edl.build_edl`).
+- **בלי `ffmpeg`** → כותב `edl.json` בלבד (ללא render).
+
+## ליבה טהורה ונבדקת
+`edl.py` (מתמטיקת חיתוכים/highlights/פרקים) ו-`render.py` (בניית פקודות ffmpeg) הם
+פונקציות טהורות עם בדיקות יחידה:
+```bash
+python -m unittest discover -s tests
+```
+
+## תלויות
+`requirements.txt` (whisper, anthropic — אופציונליים) + `ffmpeg`/`ffprobe` במערכת.

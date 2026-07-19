@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type {
+  AiJobResult,
   CalendarEvent,
   GoogleAuthStatus,
   SessionSummary,
@@ -14,6 +15,8 @@ export function CloudView(): JSX.Element {
   const [sessions, setSessions] = useState<SessionSummary[]>([])
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [busy, setBusy] = useState(false)
+  const [aiBusy, setAiBusy] = useState<string | null>(null)
+  const [aiResults, setAiResults] = useState<Record<string, AiJobResult>>({})
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
@@ -58,6 +61,15 @@ export function CloudView(): JSX.Element {
       alert(`העלאה נכשלה: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setBusy(false)
+    }
+  }
+  const editWithAi = async (id: string): Promise<void> => {
+    setAiBusy(id)
+    try {
+      const result = await window.studiomaster.ai.processSession(id)
+      setAiResults((prev) => ({ ...prev, [id]: result }))
+    } finally {
+      setAiBusy(null)
     }
   }
 
@@ -146,8 +158,16 @@ export function CloudView(): JSX.Element {
                 {s.guests.length > 0 && (
                   <span className="session__meta">אורחים: {s.guests.join(', ')}</span>
                 )}
+                {aiResults[s.id] && <AiResultLine result={aiResults[s.id]!} />}
               </div>
               <div className="session__actions">
+                <button
+                  className="btn btn--small"
+                  onClick={() => editWithAi(s.id)}
+                  disabled={aiBusy === s.id}
+                >
+                  {aiBusy === s.id ? 'עורך…' : 'ערוך אוטומטית'}
+                </button>
                 {s.uploaded ? (
                   <span className="badge badge--connected">הועלה ✓</span>
                 ) : (
@@ -178,6 +198,18 @@ export function CloudView(): JSX.Element {
         )}
       </section>
     </>
+  )
+}
+
+function AiResultLine({ result }: { result: AiJobResult }): JSX.Element {
+  if (!result.ok) return <span className="session__meta error">עריכה נכשלה: {result.error}</span>
+  const s = result.summary
+  if (!s) return <span className="session__meta">עריכה הושלמה ✓</span>
+  return (
+    <span className="session__meta">
+      ✓ {s.full_edit_segments} קטעי עריכה · {s.highlights} הדגשות · {s.chapters} פרקים ·{' '}
+      {s.rendered.length} קבצים {s.ffmpeg ? '' : '(EDL בלבד — אין ffmpeg)'}
+    </span>
   )
 }
 

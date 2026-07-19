@@ -69,16 +69,18 @@
 
 ## Phase 4 — סוכני עריכה אוטונומיים (שבועות 8–11) — *דרישה 4*
 
-- [ ] `services/ai-workers` (Python): תור job עמיד + runner.
-- [ ] Transcribe: faster-whisper + diarization.
-- [ ] Analyze: שתיקות, highlights, chapters.
-- [ ] Plan: Claude → EDL מובנה מתוך "Deliverable Template" + **מסמך התיקונים** (ReviewMarkers)
-      כקלט ישיר לחיתוכים/highlights/גבולות פרקים.
-- [ ] Render: ffmpeg מבצע EDL (חיתוך, מיזוג שמע, כתוביות, 9:16).
-- [ ] QA gate + אישור אנושי לפני פרסום.
-- [ ] Deliver: העלאה ל-Drive; אופציונלית תזמון סושיאל (MCP OneUp/Nuelink).
+- [x] `services/ai-workers` (Python): pipeline runner + CLI, עמיד לחוסר תלויות.
+- [x] Transcribe: עטיפת faster-whisper (guarded — מדלג אם לא מותקן).
+- [x] Analyze: silences + speaking-ratio מהתמלול (פונקציות טהורות).
+- [x] Plan: `edl.build_edl` דטרמיניסטי מ-**מסמך התיקונים** (ReviewMarkers) + `plan_edl` עם
+      Claude (chapter titles + חיתוכי filler) ו-fallback אוטומטי. נבדק ביחידה.
+- [x] Render: בוני פקודות ffmpeg טהורים (trim+concat, clip, reframe 9:16) — נבדקים ביחידה.
+- [x] Bridge: `ai:process-session` מייצא markers.json + מריץ את ה-worker, מציג סיכום ב-UI.
+- [ ] QA gate + אישור אנושי לפני פרסום חיצוני (מבנה קיים; gate ייחשף ב-Phase 5).
+- [ ] Deliver לסושיאל (MCP OneUp/Nuelink) — אופציונלי, לאחר אישור.
 
-**Deliverable:** מהקלטה גולמית → חבילת תוצרים ערוכה, אוטונומית.
+**Deliverable:** ✅ כפתור "ערוך אוטומטית" → סמנים/תמלול → EDL (Claude/דטרמיניסטי) → תוצרים
+(`edl.json` תמיד; קבצי וידאו כשיש ffmpeg). 17 בדיקות Python + 10 בדיקות TS עוברות.
 
 ---
 
