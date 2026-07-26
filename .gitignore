@@ -35,3 +35,6 @@ venv/
 *.log
 .DS_Store
 Thumbs.db
+
+# installer-generated (on target machine)
+/Start-StudioMaster.cmd

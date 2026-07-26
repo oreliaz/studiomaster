@@ -10,10 +10,16 @@ StudioMaster מנהלת את מחזור החיים המלא של הקלטת או
 3. **ענן וזיהוי** — העלאה אוטומטית ל-Google Drive והתאמה ל-Google Calendar.
 4. **עריכה אוטונומית** — סוכני AI מפיקים את "החומרים המוסכמים" מהחומר הגולמי.
 
+## התקנה מהירה (Windows)
+
+**הכי פשוט:** לחץ דאבל-קליק על [`installer/StudioMaster-Setup.cmd`](installer/) — אשף
+ההתקנה מתקין את הכל (Node/Python/ffmpeg/OBS + האפליקציה + מודל התמלול), רושם את הפאנל
+בתוך OBS, ויוצר קיצור דרך. ראה [`installer/README.md`](installer/README.md).
+
 ## סטטוס
 
-כל ארבע היכולות מיושמות (Phases 0–5). מריצים עם `npm install && npm run dev` (ראה
-[`docs/DEV.md`](docs/DEV.md)).
+כל ארבע היכולות מיושמות (Phases 0–5) + פיילוט מלא. הרצה ידנית: `npm install && npm run dev`
+(ראה [`docs/DEV.md`](docs/DEV.md)); מדריך פיילוט: [`docs/PILOT.md`](docs/PILOT.md).
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — ארכיטקטורה מלאה ועיצוב מודולים.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — מפת דרכים בשלבים (מה בוצע ומה נותר).
