@@ -2,7 +2,13 @@ import type { ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.
 import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
-import type { CalendarEvent, GoogleAuthStatus, SessionSummary, UploadProgress } from './cloud.js'
+import type {
+  CalendarEvent,
+  GoogleAuthStatus,
+  RunMode,
+  SessionSummary,
+  UploadProgress,
+} from './cloud.js'
 import type { AiJobResult } from './ai.js'
 import type { WizardState } from './wizard.js'
 
@@ -82,6 +88,8 @@ export interface StudioMasterApi {
   ai: {
     /** Run the autonomous editing pipeline over a recording session. */
     processSession(sessionId: string): Promise<AiJobResult>
+    getRunMode(): Promise<RunMode>
+    setRunMode(mode: RunMode): Promise<void>
   }
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void
   onRecordState(cb: (state: ObsRecordState) => void): () => void

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import type {
-  AiJobResult,
   CalendarEvent,
+  EditStatus,
   GoogleAuthStatus,
+  RunMode,
   SessionSummary,
   UploadProgress,
 } from '@studiomaster/shared'
+import { t } from '../i18n.js'
 
 export function CloudView(): JSX.Element {
   const [status, setStatus] = useState<GoogleAuthStatus>({ connected: false, configured: false })
@@ -16,12 +18,13 @@ export function CloudView(): JSX.Element {
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState<string | null>(null)
-  const [aiResults, setAiResults] = useState<Record<string, AiJobResult>>({})
+  const [runMode, setRunMode] = useState<RunMode>('ask')
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
     setStatus(s)
     setSessions(await window.studiomaster.cloud.listSessions())
+    setRunMode(await window.studiomaster.ai.getRunMode())
     if (s.connected) setEvents(await window.studiomaster.cloud.listTodayEvents())
   }
 
@@ -32,6 +35,11 @@ export function CloudView(): JSX.Element {
       if (p.state === 'done') void refresh()
     })
   }, [])
+
+  const changeRunMode = async (mode: RunMode): Promise<void> => {
+    await window.studiomaster.ai.setRunMode(mode)
+    setRunMode(mode)
+  }
 
   const saveCreds = async (): Promise<void> => {
     setStatus(await window.studiomaster.cloud.setCredentials(clientId, clientSecret))
@@ -67,7 +75,8 @@ export function CloudView(): JSX.Element {
     setAiBusy(id)
     try {
       const result = await window.studiomaster.ai.processSession(id)
-      setAiResults((prev) => ({ ...prev, [id]: result }))
+      if (!result.ok) alert(`${t('edit.error')}: ${result.error ?? ''}`)
+      await refresh()
     } finally {
       setAiBusy(null)
     }
@@ -76,11 +85,22 @@ export function CloudView(): JSX.Element {
   return (
     <>
       <header className="view__header">
-        <h1>ענן</h1>
+        <h1>{t('cloud.title')}</h1>
         <span className={`badge ${status.connected ? 'badge--connected' : ''}`}>
           {status.connected ? `מחובר · ${status.email ?? ''}` : 'לא מחובר'}
         </span>
       </header>
+
+      <section className="card">
+        <div className="field">
+          <label>{t('cloud.runmode')}</label>
+          <select value={runMode} onChange={(e) => changeRunMode(e.target.value as RunMode)}>
+            <option value="ask">{t('runmode.ask')}</option>
+            <option value="now">{t('runmode.now')}</option>
+            <option value="nightly">{t('runmode.nightly')}</option>
+          </select>
+        </div>
+      </section>
 
       <section className="card">
         <h2>חשבון Google</h2>
@@ -158,15 +178,17 @@ export function CloudView(): JSX.Element {
                 {s.guests.length > 0 && (
                   <span className="session__meta">אורחים: {s.guests.join(', ')}</span>
                 )}
-                {aiResults[s.id] && <AiResultLine result={aiResults[s.id]!} />}
+                <EditStatusLine status={s.editStatus} summary={s.editSummary} />
               </div>
               <div className="session__actions">
                 <button
                   className="btn btn--small"
                   onClick={() => editWithAi(s.id)}
-                  disabled={aiBusy === s.id}
+                  disabled={aiBusy === s.id || s.editStatus === 'running'}
                 >
-                  {aiBusy === s.id ? 'עורך…' : 'ערוך אוטומטית'}
+                  {aiBusy === s.id || s.editStatus === 'running'
+                    ? t('edit.running')
+                    : t('edit.run')}
                 </button>
                 {s.uploaded ? (
                   <span className="badge badge--connected">הועלה ✓</span>
@@ -201,14 +223,26 @@ export function CloudView(): JSX.Element {
   )
 }
 
-function AiResultLine({ result }: { result: AiJobResult }): JSX.Element {
-  if (!result.ok) return <span className="session__meta error">עריכה נכשלה: {result.error}</span>
-  const s = result.summary
-  if (!s) return <span className="session__meta">עריכה הושלמה ✓</span>
+function EditStatusLine({
+  status,
+  summary,
+}: {
+  status?: EditStatus
+  summary?: string
+}): JSX.Element | null {
+  if (!status || status === 'idle') return null
+  const label =
+    status === 'pending'
+      ? t('edit.pending')
+      : status === 'running'
+        ? t('edit.running')
+        : status === 'done'
+          ? t('edit.done')
+          : t('edit.error')
   return (
-    <span className="session__meta">
-      ✓ {s.full_edit_segments} קטעי עריכה · {s.highlights} הדגשות · {s.chapters} פרקים ·{' '}
-      {s.rendered.length} קבצים {s.ffmpeg ? '' : '(EDL בלבד — אין ffmpeg)'}
+    <span className={`session__meta ${status === 'error' ? 'error' : ''}`}>
+      {label}
+      {summary ? ` · ${summary}` : ''}
     </span>
   )
 }

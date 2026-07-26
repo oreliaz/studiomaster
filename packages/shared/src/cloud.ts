@@ -17,6 +17,8 @@ export interface CalendarEvent {
   description?: string
 }
 
+export type EditStatus = 'idle' | 'pending' | 'running' | 'done' | 'error'
+
 export interface SessionSummary {
   id: string
   title?: string
@@ -28,7 +30,15 @@ export interface SessionSummary {
   guests: string[]
   uploaded: boolean
   driveFolderId?: string
+  /** The OBS recording file, captured on record stop (input for editing). */
+  capturePath?: string
+  editStatus?: EditStatus
+  /** Short human summary of the last edit run. */
+  editSummary?: string
 }
+
+/** When the autonomous editor runs after a recording (docs §6.4, transcript). */
+export type RunMode = 'ask' | 'now' | 'nightly'
 
 export type UploadState = 'idle' | 'uploading' | 'done' | 'error'
 

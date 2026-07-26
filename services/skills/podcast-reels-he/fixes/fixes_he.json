@@ -1,0 +1,21 @@
+{
+  "_comment": "Hebrew transcription fixes applied by build_captions.py. Key = wrong word the model produces, value = correct word. Grows over time — add the corrections you make in subs_review.txt here so future episodes auto-fix. Whole-word matches only.",
+  "להשיג": "להציג",
+  "מריש": "מרגיש",
+  "אנשיו": "אנשים",
+  "אינסטוש": "אינסטגרם",
+  "בראשרת": "ברעשי רקע",
+  "עוגבים": "עוקבים",
+  "מהעוגבים": "מהעוקבים",
+  "הבידה": "הבינה",
+  "מתכתר": "מתכתב",
+  "החברותיות": "החברתיות",
+  "פייסבוק": "פייסבוק",
+  "וואטסאפ": "וואטסאפ",
+  "טיקטוק": "טיקטוק",
+  "זיקוקי דינו": "זיקוקי דינור",
+  "מולוגמיים": "מונוגמיים",
+  "מולוגביים": "מונוגמיים",
+  "מולוגבי": "מונוגמי",
+  "לינגה": "לינגם"
+}

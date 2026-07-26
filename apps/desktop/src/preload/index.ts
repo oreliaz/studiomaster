@@ -10,6 +10,7 @@ import {
   type PtzZoomCommand,
   type ReviewMarker,
   type ReviewMarkerCategory,
+  type RunMode,
   type StudioMasterApi,
   type StudioProfile,
   type UploadProgress,
@@ -81,6 +82,8 @@ const api: StudioMasterApi = {
   },
   ai: {
     processSession: (id: string) => ipcRenderer.invoke('ai:process-session', id),
+    getRunMode: () => ipcRenderer.invoke('ai:get-run-mode'),
+    setRunMode: (mode: RunMode) => ipcRenderer.invoke('ai:set-run-mode', mode),
   },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),

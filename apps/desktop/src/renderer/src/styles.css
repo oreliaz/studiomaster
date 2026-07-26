@@ -68,6 +68,28 @@ body {
   font-weight: 600;
 }
 
+.nav__lang {
+  margin-top: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.nav__lang:hover {
+  color: var(--text);
+}
+
+.checks-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 6px;
+}
+
 .main {
   flex: 1;
   padding: 24px 28px 48px;

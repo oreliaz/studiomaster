@@ -6,10 +6,16 @@ directories:
 files:
   - out/**/*
   - package.json
-# Bundle the Python editing workers next to the app (docs §6.4).
+# Bundle the Python editing workers + editing skills next to the app (docs §6.4).
 extraResources:
   - from: ../../services/ai-workers
     to: ai-workers
+    filter:
+      - '**/*'
+      - '!**/__pycache__/**'
+      - '!**/*.pyc'
+  - from: ../../services/skills
+    to: skills
     filter:
       - '**/*'
       - '!**/__pycache__/**'

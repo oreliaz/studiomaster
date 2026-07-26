@@ -61,6 +61,41 @@ export const cameraSchema = z.object({
 })
 export type Camera = z.infer<typeof cameraSchema>
 
+/** UI/output language for a profile's deliverables (Hebrew + English). */
+export const languageSchema = z.enum(['he', 'en'])
+export type Language = z.infer<typeof languageSchema>
+
+/**
+ * The pre-recording "questionnaire" (שאלון) — what the studio wants produced
+ * from an episode. Saved on the profile so it repeats every recording
+ * (docs §6.4). Drives the vendored editing skills (basic-editing-he +
+ * podcast-reels-he). `reelStyle`: 'simple' = פשוט, 'premium' = כריסלייט.
+ */
+export const deliverableTemplateSchema = z.object({
+  editType: z.enum(['none', 'basic', 'reels', 'both']).default('basic'),
+  language: languageSchema.default('he'),
+  // Basic editing (full episode).
+  intro: z.string().optional(),
+  outro: z.string().optional(),
+  targetLufs: z.number().default(-16),
+  // Reels.
+  reelsCount: z.number().int().nonnegative().default(15),
+  reelStyle: z.enum(['simple', 'premium']).default('simple'),
+  reelMinSec: z.number().int().positive().default(40),
+  reelMaxSec: z.number().int().positive().default(70),
+  // Delivery.
+  socialUpload: z.boolean().default(false),
+})
+export type DeliverableTemplate = z.infer<typeof deliverableTemplateSchema>
+
+/** Recording/routing options chosen in the questionnaire. */
+export const captureConfigSchema = z.object({
+  multitrack: z.boolean().default(false),
+  separateChannels: z.boolean().default(false),
+  routed: z.boolean().default(true),
+})
+export type CaptureConfig = z.infer<typeof captureConfigSchema>
+
 export const studioProfileSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -68,6 +103,8 @@ export const studioProfileSchema = z.object({
   lighting: lightingConfigSchema.optional(),
   obs: obsConfigSchema.default({ audioTracks: {} }),
   cameras: z.array(cameraSchema).default([]),
+  capture: captureConfigSchema.default({}),
+  deliverables: deliverableTemplateSchema.default({}),
   /** Guided wizard steps that need a human eye. */
   checklist: z.array(z.string()).default([]),
 })

@@ -46,6 +46,17 @@ export function newProfile(): StudioProfile {
     programs: [],
     obs: { audioTracks: {} },
     cameras: [],
+    capture: { multitrack: false, separateChannels: false, routed: true },
+    deliverables: {
+      editType: 'basic',
+      language: 'he',
+      targetLufs: -16,
+      reelsCount: 15,
+      reelStyle: 'simple',
+      reelMinSec: 40,
+      reelMaxSec: 70,
+      socialUpload: false,
+    },
     checklist: [],
   }
 }

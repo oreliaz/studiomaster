@@ -1,0 +1,9 @@
+{
+  "name": "podcast-reels-he-premium-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Premium-style overlay renderer deps. install.ps1 runs `npm install` here, which pulls puppeteer AND a matching Chrome automatically (no manual paths).",
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}

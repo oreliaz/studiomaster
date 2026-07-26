@@ -1,0 +1,27 @@
+{
+  "_comment": "Copy to <WORK>/config.json. intro/outro are FIXED assets reused every episode.",
+  "intro": "assets/intro.mp4",
+  "outro": "assets/outro.mp4",
+
+  "target_lufs": -16.0,
+  "target_tp": -1.5,
+  "target_lra": 11.0,
+
+  "highpass_hz": 80,
+  "denoise": "afftdn",
+  "dialogue_level": "gentle",
+
+  "v_bitrate": "10M",
+  "preset": "faster",
+
+  "_intro_transition": "If the intro ends with a black section (a 'black cut'), the episode starts AT that cut with a FADE dissolve and the intro music keeps playing under the opening, fading out. Auto-detected; set intro_dissolve:false for a plain hard cut.",
+  "intro_dissolve": true,
+  "dissolve_dur": 0.7,
+
+
+  "deadair_min_sec": 3.0,
+  "retake_similarity": 0.82,
+  "head_max_scan_sec": 180,
+  "tail_max_scan_sec": 180,
+  "snap_window_sec": 0.8
+}

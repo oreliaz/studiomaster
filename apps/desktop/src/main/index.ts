@@ -13,6 +13,7 @@ import {
   type PtzPresetCommand,
   type PtzZoomCommand,
   type ReviewMarkerCategory,
+  type RunMode,
   type StudioProfile,
   type WizardState,
 } from '@studiomaster/shared'
@@ -22,10 +23,16 @@ import { WizardOrchestrator } from './wizard.js'
 import { RecordingSessionManager } from './session.js'
 import { CloudService } from './cloud.js'
 import { AiEditor } from './ai.js'
+import { startDockServer } from './dock.js'
 
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
 const ACTIVE_PROFILE_KEY = 'active.profile'
+const RUN_MODE_KEY = 'run.mode'
+
+function getRunMode(): RunMode {
+  return (store.getSetting(RUN_MODE_KEY) as RunMode) || 'ask'
+}
 
 const store = createStore()
 const obs = new ObsController()
@@ -75,11 +82,46 @@ obs.on('record', (state: ObsRecordState) => {
     applyRecordLighting()
   } else if (!state.active && session.session) {
     const finished = session.session.id
+    const outputPath = state.outputPath
     session.end()
-    // Auto-recognize the session against today's calendar (best-effort).
-    void cloud.recognizeSession(finished).catch(() => undefined)
+    void afterRecordingStopped(finished, outputPath)
   }
 })
+
+/** On record stop: store the capture, recognize the session, and queue/run editing. */
+async function afterRecordingStopped(sessionId: string, capturePath?: string): Promise<void> {
+  const record = store.getSession(sessionId)
+  if (record) {
+    const mode = getRunMode()
+    store.saveSession({
+      ...record,
+      capturePath: capturePath ?? record.capturePath,
+      editStatus: mode === 'now' ? 'running' : 'pending',
+    })
+  }
+  await cloud.recognizeSession(sessionId).catch(() => undefined)
+  if (getRunMode() === 'now') {
+    await ai.processSession(sessionId).catch((err) => console.error('[ai] run-now failed:', err))
+  }
+}
+
+/** Nightly editor: while in the 00:00–08:00 window, drain pending edit jobs one at a time. */
+let nightlyRunning = false
+async function nightlyTick(): Promise<void> {
+  if (nightlyRunning || getRunMode() !== 'nightly') return
+  const hour = new Date().getHours()
+  if (hour >= 8) return
+  const pending = store.listSessions().find((s) => s.editStatus === 'pending')
+  if (!pending) return
+  nightlyRunning = true
+  try {
+    await ai.processSession(pending.id)
+  } catch (err) {
+    console.error('[ai] nightly job failed:', err)
+  } finally {
+    nightlyRunning = false
+  }
+}
 
 function applyRecordLighting(): void {
   const profile = activeProfile()
@@ -186,6 +228,8 @@ function registerIpc(): void {
 
   // AI editing agents
   ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))
+  ipcMain.handle('ai:get-run-mode', () => getRunMode())
+  ipcMain.handle('ai:set-run-mode', (_e, mode: RunMode) => store.setSetting(RUN_MODE_KEY, mode))
 }
 
 /** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */
@@ -241,6 +285,16 @@ app.whenReady().then(() => {
   registerIpc()
   registerHotkeys()
   createWindow()
+
+  // OBS Custom Browser Dock control server (the "plugin inside OBS" surface).
+  startDockServer({
+    getState: () => ({ connection: obs.getConnectionState(), record: obs.getRecordState() }),
+    toggleRecord: () => obs.toggleRecord(),
+    addMarker: (category) => addMarker(category),
+  })
+
+  // Nightly editor scheduler — checks every 5 minutes (docs §6.4, transcript).
+  setInterval(() => void nightlyTick(), 5 * 60 * 1000)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

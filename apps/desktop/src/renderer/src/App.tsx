@@ -4,19 +4,21 @@ import { DashboardView } from './views/DashboardView.js'
 import { LiveView } from './views/LiveView.js'
 import { ProfilesView } from './views/ProfilesView.js'
 import { WizardView } from './views/WizardView.js'
+import { getLang, setLang, t } from './i18n.js'
 
 type View = 'wizard' | 'dashboard' | 'live' | 'cloud' | 'profiles'
 
-const NAV: { id: View; label: string }[] = [
-  { id: 'wizard', label: 'פתיחת אולפן' },
-  { id: 'dashboard', label: 'הקלטה' },
-  { id: 'live', label: 'אולפן חי' },
-  { id: 'cloud', label: 'ענן' },
-  { id: 'profiles', label: 'אולפנים' },
+const NAV: { id: View; key: string }[] = [
+  { id: 'wizard', key: 'nav.wizard' },
+  { id: 'dashboard', key: 'nav.dashboard' },
+  { id: 'live', key: 'nav.live' },
+  { id: 'cloud', key: 'nav.cloud' },
+  { id: 'profiles', key: 'nav.profiles' },
 ]
 
 export function App(): JSX.Element {
   const [view, setView] = useState<View>('wizard')
+  const lang = getLang()
 
   return (
     <div className="shell">
@@ -28,9 +30,16 @@ export function App(): JSX.Element {
             className={`nav__item ${view === item.id ? 'is-active' : ''}`}
             onClick={() => setView(item.id)}
           >
-            {item.label}
+            {t(item.key)}
           </button>
         ))}
+        <button
+          className="nav__lang"
+          onClick={() => setLang(lang === 'he' ? 'en' : 'he')}
+          title="Language"
+        >
+          {lang === 'he' ? 'EN' : 'עב'}
+        </button>
       </nav>
       <main className="main">
         {view === 'wizard' && <WizardView />}

@@ -1,0 +1,4 @@
+.env
+premium-engine/node_modules/
+**/__pycache__/
+*.pyc
