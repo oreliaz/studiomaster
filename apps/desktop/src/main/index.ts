@@ -73,7 +73,15 @@ function getPtz(): PtzController | null {
 }
 
 // ── OBS state → renderer + session lifecycle ──
-obs.on('connection', (state: ObsConnectionState) => broadcast(IPC_EVENTS.obsConnection, state))
+obs.on('connection', (state: ObsConnectionState) => {
+  broadcast(IPC_EVENTS.obsConnection, state)
+  if (state.status === 'connected') {
+    // Auto-create the on-screen marker overlay source (docs §6.2.2) — no manual OBS setup.
+    void obs
+      .ensureMarkerOverlay(MARKER_OVERLAY_SOURCE, '✓ נרשם סימון')
+      .catch((err) => console.warn('[obs] ensure marker overlay failed:', err))
+  }
+})
 obs.on('levels', (levels: InputLevel[]) => broadcast(IPC_EVENTS.mixerLevels, levels))
 obs.on('record', (state: ObsRecordState) => {
   broadcast(IPC_EVENTS.obsRecord, state)

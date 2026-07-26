@@ -176,5 +176,6 @@ Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
 Write-Host " ההתקנה הושלמה! להפעלה: לחץ על 'StudioMaster' בשולחן העבודה" -ForegroundColor Green
 Write-Host " ואז ב-OBS: Tools → WebSocket Server Settings → Enable (4455)" -ForegroundColor Green
+Write-Host " מקור החיווי 'StudioMaster Marker' וה-Dock ייווצרו אוטומטית בחיבור הראשון." -ForegroundColor Green
 Write-Host " מדריך מלא: docs\PILOT.md" -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green

@@ -32,7 +32,9 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
 - אם אין **winget** במחשב: התקן "App Installer" מ-Microsoft Store, או התקן ידנית את הכלים
   מטבלת השלב הראשון — שאר האשף ימשיך לעבוד.
 - אחרי ההתקנה: הפעל StudioMaster מהקיצור, וב-OBS הפעל
-  **Tools → WebSocket Server Settings → Enable** (פורט 4455).
+  **Tools → WebSocket Server Settings → Enable** (פורט 4455). בחיבור הראשון,
+  StudioMaster **יוצר אוטומטית** את מקור החיווי `StudioMaster Marker` בסצנה הנוכחית
+  (מוסתר — אפשר לעצב/למקם אותו כרצונך).
 - מדריך העבודה המלא: [`../docs/PILOT.md`](../docs/PILOT.md).
 
 ## What it does (English)

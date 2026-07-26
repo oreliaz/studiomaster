@@ -199,6 +199,59 @@ export class ObsController extends EventEmitter {
     return currentProgramSceneName ?? null
   }
 
+  /**
+   * Ensure the marker-confirmation overlay source exists in the current scene
+   * (docs §6.2.2). Creates a hidden text source if missing, so the on-screen
+   * marker flash works with zero manual OBS setup. Idempotent.
+   */
+  async ensureMarkerOverlay(sourceName: string, text: string): Promise<void> {
+    const scene = await this.getCurrentSceneName()
+    if (!scene) return
+
+    // Already present in this scene? Then nothing to do.
+    try {
+      await this.obs.call('GetSceneItemId', { sceneName: scene, sourceName })
+      return
+    } catch {
+      // not in the current scene — fall through
+    }
+
+    // The input may already exist (in another scene) — just add it here.
+    const { inputs } = await this.obs.call('GetInputList')
+    const exists = inputs.some((i) => String(i.inputName) === sourceName)
+    if (exists) {
+      await this.obs.call('CreateSceneItem', {
+        sceneName: scene,
+        sourceName,
+        sceneItemEnabled: false,
+      })
+      return
+    }
+
+    // Create a new hidden text source with the confirmation label.
+    const kind = await this.pickTextInputKind()
+    if (!kind) return
+    await this.obs.call('CreateInput', {
+      sceneName: scene,
+      inputName: sourceName,
+      inputKind: kind,
+      inputSettings: { text, font: { face: 'Arial', size: 96 } },
+      sceneItemEnabled: false,
+    })
+  }
+
+  /** Pick an available text input kind (GDI+ on Windows, FreeType elsewhere). */
+  private async pickTextInputKind(): Promise<string | null> {
+    const { inputKinds } = await this.obs.call('GetInputKindList')
+    const kinds = inputKinds.map(String)
+    return (
+      kinds.find((k) => k.includes('text_gdiplus')) ??
+      kinds.find((k) => k.includes('text_ft2')) ??
+      kinds.find((k) => k.includes('text')) ??
+      null
+    )
+  }
+
   // ─── internals ─────────────────────────────────────────────────────────────
 
   private registerObsEvents(): void {
