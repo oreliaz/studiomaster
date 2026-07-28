@@ -15,7 +15,7 @@
 | 2 | `npm install` + בניית `better-sqlite3` ל-Electron |
 | 3 | מתקין את סוכני העריכה + **מודל התמלול העברי** (ivrit.ai Whisper, ~1.6GB) |
 | 4 | בונה את האפליקציה |
-| 5 | רושם אוטומטית את פאנל StudioMaster **בתוך OBS** (Custom Browser Dock) |
+| 5 | **מפעיל את WebSocket ב-OBS** (4455, ללא סיסמה) ורושם את פאנל StudioMaster **בתוך OBS** |
 | 6 | יוצר קיצור דרך **StudioMaster** על שולחן העבודה |
 
 ## אפשרויות
@@ -31,10 +31,9 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
 - **סגור את OBS** לפני ההתקנה כדי שרישום ה-Dock יישמר (OBS דורס את ההגדרות ביציאה).
 - אם אין **winget** במחשב: התקן "App Installer" מ-Microsoft Store, או התקן ידנית את הכלים
   מטבלת השלב הראשון — שאר האשף ימשיך לעבוד.
-- אחרי ההתקנה: הפעל StudioMaster מהקיצור, וב-OBS הפעל
-  **Tools → WebSocket Server Settings → Enable** (פורט 4455). בחיבור הראשון,
-  StudioMaster **יוצר אוטומטית** את מקור החיווי `StudioMaster Marker` בסצנה הנוכחית
-  (מוסתר — אפשר לעצב/למקם אותו כרצונך).
+- אחרי ההתקנה: פשוט הפעל StudioMaster מהקיצור ולחץ **התחבר** — ה-WebSocket של OBS כבר דלוק
+  (4455, ללא סיסמה). בחיבור הראשון StudioMaster **יוצר אוטומטית** את מקור החיווי
+  `StudioMaster Marker` בסצנה הנוכחית (מוסתר — אפשר לעצב/למקם אותו כרצונך).
 - מדריך העבודה המלא: [`../docs/PILOT.md`](../docs/PILOT.md).
 
 ## What it does (English)

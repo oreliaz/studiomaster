@@ -60,11 +60,56 @@ function Install-Prereq([string]$id, [string]$probeCmd, [string]$label) {
   if (Have-Cmd $probeCmd) { Write-Ok "$label הותקן" } else { Write-Warn2 "$label — ייתכן שצריך לפתוח חלון חדש כדי לרענן PATH" }
 }
 
-function Add-ObsDock {
+function Ensure-ObsIni {
+  # Returns the OBS global.ini path, creating the folder + an empty file if OBS
+  # has never run (so websocket/dock can be pre-configured on a fresh machine).
+  $ini = Join-Path $env:APPDATA 'obs-studio\global.ini'
+  $dir = Split-Path -Parent $ini
+  if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+  if (-not (Test-Path $ini)) {
+    New-Item -ItemType File -Force -Path $ini | Out-Null
+    Write-Warn2 "נוצר global.ini ראשוני ל-OBS (OBS עדיין לא הורץ)"
+  }
+  return $ini
+}
+
+function Set-IniValues([string]$ini, [string]$section, [hashtable]$kv) {
+  # Set key=value pairs inside an INI [section], adding the section/keys if absent.
+  $lines = [System.Collections.Generic.List[string]](Get-Content -LiteralPath $ini -Encoding UTF8)
+  $secStart = -1
+  for ($i = 0; $i -lt $lines.Count; $i++) {
+    if ($lines[$i].Trim() -eq "[$section]") { $secStart = $i; break }
+  }
+  if ($secStart -lt 0) {
+    $lines.Add("[$section]")
+    foreach ($k in $kv.Keys) { $lines.Add("$k=$($kv[$k])") }
+    Set-Content -LiteralPath $ini -Value $lines -Encoding UTF8
+    return
+  }
+  $secEnd = $lines.Count
+  for ($i = $secStart + 1; $i -lt $lines.Count; $i++) {
+    if ($lines[$i].Trim() -match '^\[.*\]$') { $secEnd = $i; break }
+  }
+  foreach ($k in $kv.Keys) {
+    $found = $false
+    for ($i = $secStart + 1; $i -lt $secEnd; $i++) {
+      if ($lines[$i] -match "^\s*$([regex]::Escape($k))\s*=") { $lines[$i] = "$k=$($kv[$k])"; $found = $true; break }
+    }
+    if (-not $found) { $lines.Insert($secEnd, "$k=$($kv[$k])"); $secEnd++ }
+  }
+  Set-Content -LiteralPath $ini -Value $lines -Encoding UTF8
+}
+
+function Enable-ObsWebSocket([string]$ini) {
+  # Turn on the built-in obs-websocket server (port 4455, no password) so
+  # StudioMaster connects with zero manual OBS setup.
+  Set-IniValues $ini 'OBSWebSocket' @{ ServerEnabled = 'true'; ServerPort = '4455'; AuthRequired = 'false'; FirstLoad = 'false' }
+  Write-Ok "obs-websocket הופעל (פורט 4455, ללא סיסמה) — יחול בהפעלת OBS"
+}
+
+function Add-ObsDock([string]$ini) {
   # Registers http://127.0.0.1:3939/dock as an OBS Custom Browser Dock by
   # merging into OBS global.ini. OBS must be CLOSED (it rewrites on exit).
-  $ini = Join-Path $env:APPDATA 'obs-studio\global.ini'
-  if (-not (Test-Path $ini)) { Write-Warn2 "OBS עדיין לא הורץ פעם ראשונה — דלג על הוספת ה-Dock (אפשר להוסיף ידנית)"; return }
   $url = 'http://127.0.0.1:3939/dock'
   $dock = [ordered]@{ title = 'StudioMaster'; url = $url }
   $lines = Get-Content -LiteralPath $ini -Encoding UTF8
@@ -163,10 +208,14 @@ try {
   }
 } finally { Pop-Location }
 
-# 5) OBS dock
-Write-Step "רישום הפאנל של StudioMaster בתוך OBS (Custom Browser Dock)"
-Write-Warn2 "אם OBS פתוח — סגור אותו עכשיו כדי שהשינוי יישמר."
-try { Add-ObsDock } catch { Write-Warn2 "לא ניתן לעדכן את OBS אוטומטית: $($_.Exception.Message)" }
+# 5) OBS: enable websocket + register the dock
+Write-Step "הגדרת OBS: הפעלת WebSocket + רישום הפאנל (Custom Browser Dock)"
+Write-Warn2 "אם OBS פתוח — סגור אותו עכשיו כדי שהשינויים יישמרו."
+try {
+  $obsIni = Ensure-ObsIni
+  Enable-ObsWebSocket $obsIni
+  Add-ObsDock $obsIni
+} catch { Write-Warn2 "לא ניתן לעדכן את OBS אוטומטית: $($_.Exception.Message)" }
 
 # 6) Shortcut
 Write-Step "יצירת קיצור דרך"
@@ -174,8 +223,8 @@ try { New-Shortcut } catch { Write-Warn2 "יצירת קיצור נכשלה: $($_
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
-Write-Host " ההתקנה הושלמה! להפעלה: לחץ על 'StudioMaster' בשולחן העבודה" -ForegroundColor Green
-Write-Host " ואז ב-OBS: Tools → WebSocket Server Settings → Enable (4455)" -ForegroundColor Green
-Write-Host " מקור החיווי 'StudioMaster Marker' וה-Dock ייווצרו אוטומטית בחיבור הראשון." -ForegroundColor Green
+Write-Host " ההתקנה הושלמה! פשוט הפעל את 'StudioMaster' משולחן העבודה." -ForegroundColor Green
+Write-Host " OBS מוגדר אוטומטית: WebSocket דלוק (4455, ללא סיסמה) + הפאנל בפנים." -ForegroundColor Green
+Write-Host " מקור החיווי 'StudioMaster Marker' ייווצר אוטומטית בחיבור הראשון." -ForegroundColor Green
 Write-Host " מדריך מלא: docs\PILOT.md" -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
