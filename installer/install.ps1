@@ -27,6 +27,9 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Total = 6
 $Step = 0
 
+# Remove "Mark of the Web" from our own scripts so re-runs aren't SmartScreen-blocked.
+try { Get-ChildItem -Path $PSScriptRoot -File -ErrorAction SilentlyContinue | Unblock-File -ErrorAction SilentlyContinue } catch {}
+
 function Write-Step([string]$msg) {
   $script:Step++
   Write-Host ""

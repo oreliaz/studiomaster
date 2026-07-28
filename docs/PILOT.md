@@ -104,6 +104,18 @@ Same flow, in short:
 8. **Cloud & Edit** tab → pick when the auto-editor runs (now / manual / overnight
    00:00–08:00). Outputs land in the session folder and optionally upload to Drive.
 
+## אבטחת Windows — SmartScreen / Smart App Control
+
+Windows חוסם קבצים לא-חתומים (אין לנו עדיין תעודת code-signing). מה עושים:
+
+- **מומלץ:** הפעל את StudioMaster **מהקיצור** (`npm run dev`) — משתמש ב-electron.exe החתום,
+  ולא נחסם. **אל** תריץ את ה-`.exe` הבנוי בפיילוט (הוא לא חתום → נחסם).
+- אם קובץ `.cmd`/`.ps1` נחסם: לחיצה ימנית → **Properties → Unblock → Apply**.
+- אם קופץ **SmartScreen** ("Windows protected your PC"): **More info → Run anyway**.
+- אם **Smart App Control** (Win11) חוסם לגמרי: Settings → Windows Security → App & browser
+  control → **Smart App Control → Off** (על מחשב אולפן ייעודי זה סביר), או הישאר ב-dev mode.
+- **לטווח ארוך:** חתימת קוד (EV/OV certificate) מסירה את החסימות בהפצה. לא נדרש לפיילוט.
+
 ## מגבלות ידועות בפיילוט · Known pilot limits
 - הצעת 15 הקליפים לרילס: כרגע נגזרת מסמני ההדגשה + פיזור אחיד (הבחירה החכמה עם מודל —
   שלב הבא). *(Reel clip selection is marker-driven for now; model-picked clips are next.)*

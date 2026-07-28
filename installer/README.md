@@ -36,6 +36,12 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
   `StudioMaster Marker` בסצנה הנוכחית (מוסתר — אפשר לעצב/למקם אותו כרצונך).
 - מדריך העבודה המלא: [`../docs/PILOT.md`](../docs/PILOT.md).
 
+## אם Windows חוסם (SmartScreen / Smart App Control)
+Windows חוסם קבצים לא-חתומים. **הפעל מהקיצור** (dev mode, electron חתום) ולא מה-`.exe`.
+אם קובץ נחסם: ימני → **Properties → Unblock**. אם קופץ SmartScreen: **More info → Run anyway**.
+אם Smart App Control ב-Win11 חוסם — כבה אותו ב-Windows Security, או הישאר ב-dev mode.
+פרטים: [`../docs/PILOT.md`](../docs/PILOT.md#אבטחת-windows--smartscreen--smart-app-control).
+
 ## What it does (English)
 One-click installer for a single studio PC: installs Node/Python/ffmpeg/OBS via
 winget, installs app + Python editing deps + the Hebrew Whisper model, registers
