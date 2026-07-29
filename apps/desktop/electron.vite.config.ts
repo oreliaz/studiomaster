@@ -27,10 +27,16 @@ const alias = {
   '@studiomaster/ptz-control': resolve(__dirname, '../../packages/ptz-control/src/index.ts'),
 }
 
+// `ws` (pulled in by obs-websocket-js) optionally requires these native addons;
+// they may be absent on machines without a build toolchain. `ws` works without
+// them, so keep them external and let its runtime try/catch handle a miss.
+const optionalNative = ['bufferutil', 'utf-8-validate']
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: bundledWorkspaceDeps })],
     resolve: { alias },
+    build: { rollupOptions: { external: optionalNative } },
   },
   preload: {
     plugins: [externalizeDepsPlugin({ exclude: bundledWorkspaceDeps })],
