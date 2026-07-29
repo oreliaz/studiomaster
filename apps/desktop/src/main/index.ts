@@ -27,6 +27,7 @@ import { RecordingSessionManager } from './session.js'
 import { CloudService } from './cloud.js'
 import { AiEditor } from './ai.js'
 import { startDockServer } from './dock.js'
+import { splitAudioTracks } from './audioSplit.js'
 
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
@@ -154,6 +155,17 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
       capturePath: capturePath ?? record.capturePath,
       editStatus: mode === 'now' ? 'running' : 'pending',
     })
+  }
+  // Separate audio per microphone: split OBS multi-track recordings into one
+  // WAV per track in the session's audio/ folder (no-op for single-track files).
+  const source = capturePath ?? record?.capturePath
+  if (source && record?.storagePath) {
+    try {
+      const { files, trackCount } = await splitAudioTracks(source, record.storagePath)
+      if (files.length) console.log(`[audio] split ${trackCount} tracks →`, files)
+    } catch (err) {
+      console.warn('[audio] track split failed:', err)
+    }
   }
   await cloud.recognizeSession(sessionId).catch(() => undefined)
   if (mode === 'now') {
