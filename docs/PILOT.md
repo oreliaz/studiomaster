@@ -22,7 +22,6 @@ git clone <repo-url> studiomaster
 cd studiomaster
 git checkout claude/obs-studio-management-system-ql7jfj
 npm install
-npm run rebuild --workspace @studiomaster/desktop   # מקמפל better-sqlite3 ל-Electron
 npm run dev                                          # פותח את האפליקציה
 ```
 לגרסת `.exe` להתקנה רגילה: `npm run dist:win` → הקובץ ב-`apps/desktop/release/`.
@@ -92,7 +91,7 @@ python scripts\setup_check.py     # מדווח מה מוכן
 
 Same flow, in short:
 1. Install **OBS 28+, Node 20+, Python 3.11+, ffmpeg**.
-2. `git clone` → `npm install` → `npm run rebuild -w @studiomaster/desktop` → `npm run dev`.
+2. `git clone` → `npm install` → `npm run dev`.
 3. OBS **Tools → WebSocket Server Settings** → Enable (port 4455). Connect in the **Record** tab.
 4. OBS **Docks → Custom Browser Docks** → `http://127.0.0.1:3939/dock` to embed the panel.
 5. Install skill deps once: `services/skills/podcast-reels-he/install.ps1` (downloads the

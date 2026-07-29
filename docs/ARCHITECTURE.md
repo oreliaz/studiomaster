@@ -114,7 +114,7 @@ OBS, ה-Launcher, הענן, וה-AI workers.
 | Orchestrator           | **Node.js (Main process)**                              | state machine, ניהול תת-מערכות        |
 | OBS control            | **obs-websocket-js v5**                                 | client רשמי לפרוטוקול 5.x             |
 | PTZ control            | **VISCA-over-IP** (UDP :52381) native, או גשר ל-obs-ptz | Minrray + OBSBOT Tail Air             |
-| מצב מקומי              | **SQLite (better-sqlite3)**                             | sessions, jobs, prefs — ללא שרת       |
+| מצב מקומי              | **קובץ JSON תחת userData** (ללא תלות native)            | sessions, jobs, prefs — ללא שרת       |
 | תור עבודות             | **תור מבוסס-SQLite** (או BullMQ אם נדרש Redis)          | פשטות, ללא תלות חיצונית ל-MVP         |
 | Google                 | **googleapis (Node)** + OAuth2 (loopback)               | Drive + Calendar רשמי                 |
 | AI workers             | **Python 3.11+** microservice                           | ffmpeg, faster-whisper, ניתוח וידאו   |

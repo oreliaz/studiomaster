@@ -1,62 +1,21 @@
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { app } from 'electron'
-import Database from 'better-sqlite3'
 import {
   studioProfileSchema,
   type ObsConnectionParams,
   type ReviewMarker,
-  type ReviewMarkerCategory,
   type SessionSummary,
   type StudioProfile,
 } from '@studiomaster/shared'
 
 /**
- * Local persistence (docs/ARCHITECTURE.md §7). Phase 1 adds studio profiles on
- * top of the Phase 0 settings store. SQLite is a native module; if it fails to
- * load (e.g. not rebuilt for the current Electron ABI) the app degrades to an
- * in-memory store rather than crashing, so the rest of the app still works.
+ * Local persistence (docs/ARCHITECTURE.md §7). Backed by a single JSON file
+ * under userData — deliberately dependency-free (no native modules), so
+ * `npm install` never needs a C/C++ toolchain and the app always launches. The
+ * data set (profiles, sessions, markers, settings) is tiny, so whole-file
+ * writes are fine. Falls back to an in-memory store if the file can't be used.
  */
-
-interface SettingsRow {
-  value: string
-}
-interface ProfileRow {
-  json: string
-}
-
-const MIGRATIONS: string[] = [
-  `CREATE TABLE IF NOT EXISTS settings (
-     key   TEXT PRIMARY KEY,
-     value TEXT NOT NULL
-   );`,
-  `CREATE TABLE IF NOT EXISTS sessions (
-     id            TEXT PRIMARY KEY,
-     profile_id    TEXT,
-     title         TEXT,
-     status        TEXT NOT NULL,
-     started_at    TEXT,
-     ended_at      TEXT,
-     storage_path  TEXT
-   );`,
-  `CREATE TABLE IF NOT EXISTS profiles (
-     id   TEXT PRIMARY KEY,
-     name TEXT NOT NULL,
-     json TEXT NOT NULL
-   );`,
-  `CREATE TABLE IF NOT EXISTS markers (
-     id         TEXT PRIMARY KEY,
-     session_id TEXT NOT NULL,
-     tc_ms      INTEGER NOT NULL,
-     category   TEXT NOT NULL,
-     note       TEXT,
-     created_at TEXT NOT NULL
-   );`,
-  `CREATE TABLE IF NOT EXISTS session_records (
-     id         TEXT PRIMARY KEY,
-     started_at TEXT NOT NULL,
-     json       TEXT NOT NULL
-   );`,
-]
 
 export interface Store {
   getSetting(key: string): string | null
@@ -75,35 +34,60 @@ export interface Store {
   listSessions(): SessionSummary[]
 }
 
+interface DbShape {
+  settings: Record<string, string>
+  profiles: Record<string, StudioProfile>
+  markers: ReviewMarker[]
+  sessions: Record<string, SessionSummary>
+}
+
+const EMPTY: DbShape = { settings: {}, profiles: {}, markers: [], sessions: {} }
 const OBS_CONNECTION_KEY = 'obs.connection'
 
-/** Parse + validate a stored profile; returns null if it no longer matches. */
-function parseProfile(json: string): StudioProfile | null {
+function parseProfile(profile: StudioProfile): StudioProfile | null {
   try {
-    return studioProfileSchema.parse(JSON.parse(json))
+    return studioProfileSchema.parse(profile)
   } catch {
     return null
   }
 }
 
-class SqliteStore implements Store {
-  constructor(private readonly db: Database.Database) {
-    db.pragma('journal_mode = WAL')
-    for (const migration of MIGRATIONS) db.exec(migration)
+class JsonFileStore implements Store {
+  private readonly path: string
+  private readonly data: DbShape
+
+  constructor() {
+    this.path = join(app.getPath('userData'), 'studiomaster.json')
+    this.data = this.load()
+  }
+
+  private load(): DbShape {
+    try {
+      if (existsSync(this.path)) {
+        const parsed = JSON.parse(readFileSync(this.path, 'utf8')) as Partial<DbShape>
+        return { ...EMPTY, ...parsed }
+      }
+    } catch (err) {
+      console.error('[store] failed to read data file, starting fresh:', err)
+    }
+    return structuredClone(EMPTY)
+  }
+
+  private save(): void {
+    try {
+      mkdirSync(dirname(this.path), { recursive: true })
+      writeFileSync(this.path, JSON.stringify(this.data, null, 2), 'utf8')
+    } catch (err) {
+      console.error('[store] failed to write data file:', err)
+    }
   }
 
   getSetting(key: string): string | null {
-    const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
-      SettingsRow | undefined
-    return row?.value ?? null
+    return this.data.settings[key] ?? null
   }
-
   setSetting(key: string, value: string): void {
-    this.db
-      .prepare(
-        'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-      )
-      .run(key, value)
+    this.data.settings[key] = value
+    this.save()
   }
 
   getSavedConnection(): ObsConnectionParams | null {
@@ -115,107 +99,64 @@ class SqliteStore implements Store {
       return null
     }
   }
-
   saveConnection(params: ObsConnectionParams): void {
     this.setSetting(OBS_CONNECTION_KEY, JSON.stringify(params))
   }
 
   listProfiles(): StudioProfile[] {
-    const rows = this.db.prepare('SELECT json FROM profiles ORDER BY name').all() as ProfileRow[]
-    return rows.map((r) => parseProfile(r.json)).filter((p): p is StudioProfile => p !== null)
+    return Object.values(this.data.profiles)
+      .map(parseProfile)
+      .filter((p): p is StudioProfile => p !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
-
   getProfile(id: string): StudioProfile | null {
-    const row = this.db.prepare('SELECT json FROM profiles WHERE id = ?').get(id) as
-      ProfileRow | undefined
-    return row ? parseProfile(row.json) : null
+    const p = this.data.profiles[id]
+    return p ? parseProfile(p) : null
   }
-
   saveProfile(profile: StudioProfile): StudioProfile {
     const validated = studioProfileSchema.parse(profile)
-    this.db
-      .prepare(
-        'INSERT INTO profiles (id, name, json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, json = excluded.json',
-      )
-      .run(validated.id, validated.name, JSON.stringify(validated))
+    this.data.profiles[validated.id] = validated
+    this.save()
     return validated
   }
-
   deleteProfile(id: string): void {
-    this.db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
+    delete this.data.profiles[id]
+    this.save()
   }
 
   addMarker(marker: ReviewMarker): void {
-    this.db
-      .prepare(
-        'INSERT INTO markers (id, session_id, tc_ms, category, note, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-      )
-      .run(
-        marker.id,
-        marker.sessionId,
-        marker.tcMs,
-        marker.category,
-        marker.note ?? null,
-        marker.createdAt,
-      )
+    this.data.markers.push(marker)
+    this.save()
   }
-
   listMarkers(sessionId?: string): ReviewMarker[] {
-    const rows = sessionId
-      ? (this.db
-          .prepare('SELECT * FROM markers WHERE session_id = ? ORDER BY tc_ms')
-          .all(sessionId) as MarkerRow[])
-      : (this.db.prepare('SELECT * FROM markers ORDER BY created_at').all() as MarkerRow[])
-    return rows.map(rowToMarker)
+    const all = sessionId
+      ? this.data.markers.filter((m) => m.sessionId === sessionId)
+      : this.data.markers
+    return [...all].sort((a, b) => a.tcMs - b.tcMs)
   }
-
   updateMarkerNote(id: string, note: string): void {
-    this.db.prepare('UPDATE markers SET note = ? WHERE id = ?').run(note, id)
+    const marker = this.data.markers.find((m) => m.id === id)
+    if (marker) {
+      marker.note = note
+      this.save()
+    }
   }
 
   saveSession(session: SessionSummary): void {
-    this.db
-      .prepare(
-        'INSERT INTO session_records (id, started_at, json) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET started_at = excluded.started_at, json = excluded.json',
-      )
-      .run(session.id, session.startedAt, JSON.stringify(session))
+    this.data.sessions[session.id] = session
+    this.save()
   }
-
   getSession(id: string): SessionSummary | null {
-    const row = this.db.prepare('SELECT json FROM session_records WHERE id = ?').get(id) as
-      { json: string } | undefined
-    return row ? (JSON.parse(row.json) as SessionSummary) : null
+    return this.data.sessions[id] ?? null
   }
-
   listSessions(): SessionSummary[] {
-    const rows = this.db
-      .prepare('SELECT json FROM session_records ORDER BY started_at DESC')
-      .all() as { json: string }[]
-    return rows.map((r) => JSON.parse(r.json) as SessionSummary)
+    return Object.values(this.data.sessions).sort((a, b) =>
+      b.startedAt.localeCompare(a.startedAt),
+    )
   }
 }
 
-interface MarkerRow {
-  id: string
-  session_id: string
-  tc_ms: number
-  category: string
-  note: string | null
-  created_at: string
-}
-
-function rowToMarker(r: MarkerRow): ReviewMarker {
-  return {
-    id: r.id,
-    sessionId: r.session_id,
-    tcMs: r.tc_ms,
-    category: r.category as ReviewMarkerCategory,
-    note: r.note ?? undefined,
-    createdAt: r.created_at,
-  }
-}
-
-/** Fallback used when the native SQLite module is unavailable. */
+/** Volatile fallback if even the JSON file can't be used. */
 class MemoryStore implements Store {
   private readonly settings = new Map<string, string>()
   private readonly profiles = new Map<string, StudioProfile>()
@@ -273,10 +214,9 @@ class MemoryStore implements Store {
 
 export function createStore(): Store {
   try {
-    const dbPath = join(app.getPath('userData'), 'studiomaster.sqlite')
-    return new SqliteStore(new Database(dbPath))
+    return new JsonFileStore()
   } catch (err) {
-    console.error('[store] SQLite unavailable, falling back to in-memory store:', err)
+    console.error('[store] JSON store unavailable, using in-memory store:', err)
     return new MemoryStore()
   }
 }

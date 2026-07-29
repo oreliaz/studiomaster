@@ -164,14 +164,13 @@ if ($SkipPrereqs) {
   Install-Prereq 'OBSProject.OBSStudio' 'obs64' 'OBS Studio'
 }
 
-# 2) App dependencies
-Write-Step "Installing StudioMaster (npm install + rebuild)"
+# 2) App dependencies (pure JS - no native build/toolchain needed)
+Write-Step "Installing StudioMaster (npm install)"
 Push-Location $RepoRoot
 try {
-  cmd /c "npm install" | Write-Host
-  Write-Ok "npm install done"
-  try { cmd /c "npm run rebuild --workspace @studiomaster/desktop" | Write-Host; Write-Ok "better-sqlite3 built for Electron" }
-  catch { Write-Warn2 "rebuild failed - app falls back to in-memory store (still works)" }
+  cmd /c "npm install"
+  if ($LASTEXITCODE -eq 0) { Write-Ok "npm install done" }
+  else { Write-Warn2 "npm install reported errors (exit $LASTEXITCODE) - see output above" }
 } finally { Pop-Location }
 
 # 3) Python editing deps + Hebrew Whisper model

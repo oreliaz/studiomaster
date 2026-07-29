@@ -11,8 +11,7 @@
     "dist:win": "electron-vite build && electron-builder --win --config electron-builder.yml",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
-    "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "rebuild": "electron-rebuild -f -w better-sqlite3"
+    "typecheck": "npm run typecheck:node && npm run typecheck:web"
   },
   "dependencies": {
     "@studiomaster/lighting": "*",
@@ -20,14 +19,11 @@
     "@studiomaster/ptz-control": "*",
     "@studiomaster/shared": "*",
     "@studiomaster/studio-launcher": "*",
-    "better-sqlite3": "^11.3.0",
     "googleapis": "^144.0.0",
     "obs-websocket-js": "^5.0.6",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@electron/rebuild": "^3.6.0",
-    "@types/better-sqlite3": "^7.6.11",
     "electron-builder": "^24.13.3",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",

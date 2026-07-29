@@ -13,8 +13,7 @@ npm install
 ```
 
 > אם הורדת ה-binary של Electron נחסמת ברשת: `set ELECTRON_SKIP_BINARY_DOWNLOAD=1` (הרצה ידנית תוריד בהמשך).
-> מודול native (`better-sqlite3`) תחת Electron: `npm run rebuild --workspace @studiomaster/desktop`.
-> אם ה-rebuild נכשל — האפליקציה נופלת אוטומטית ל-store בזיכרון וממשיכה לעבוד.
+> אין תלות native — האחסון הוא קובץ JSON תחת userData, כך ש-`npm install` לא דורש כלי build.
 
 ## פיתוח
 

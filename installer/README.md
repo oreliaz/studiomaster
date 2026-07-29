@@ -12,7 +12,7 @@
 | שלב | מה קורה |
 |-----|---------|
 | 1 | מתקין (דרך winget) את **Node.js, Python 3.11, ffmpeg, OBS Studio** — מדלג על מה שכבר קיים |
-| 2 | `npm install` + בניית `better-sqlite3` ל-Electron |
+| 2 | `npm install` (ללא תלות native — לא נדרש כלי build) |
 | 3 | מתקין את סוכני העריכה + **מודל התמלול העברי** (ivrit.ai Whisper, ~1.6GB) |
 | 4 | בונה את האפליקציה |
 | 5 | **מפעיל את WebSocket ב-OBS** (4455, ללא סיסמה) ורושם את פאנל StudioMaster **בתוך OBS** |
