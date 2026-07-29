@@ -1,18 +1,20 @@
 <#
   StudioMaster installer wizard (Windows).
 
+  ASCII-only on purpose: Windows PowerShell 5.1 reads .ps1 files as the system
+  ANSI codepage (not UTF-8), so non-ASCII text corrupts parsing. Keeping this
+  file ASCII makes it robust on every PowerShell version and locale. (The app's
+  own Hebrew UI is unaffected - that runs in Electron, which is UTF-8.)
+
   Installs everything needed to run a pilot on one machine:
     1. Prerequisites via winget: Node.js LTS, Python 3.11, ffmpeg, OBS Studio
-    2. App dependencies (npm install) + native rebuild (better-sqlite3 for Electron)
-    3. Python editing deps + the Hebrew Whisper model (the reels skill's install.ps1)
-    4. Registers the StudioMaster panel as an OBS Custom Browser Dock
-    5. Creates a desktop shortcut to launch the app
+    2. App dependencies (npm install) + native rebuild (better-sqlite3)
+    3. Python editing deps + the Hebrew Whisper model
+    4. Enables obs-websocket + registers the StudioMaster OBS dock
+    5. Creates a desktop shortcut
 
   Run by double-clicking StudioMaster-Setup.cmd, or:
     powershell -ExecutionPolicy Bypass -File install.ps1 [-Build] [-SkipPrereqs]
-
-  -Build       also produce a Windows installer .exe (npm run dist:win)
-  -SkipPrereqs skip the winget prerequisite installs
 #>
 
 param(
@@ -21,7 +23,6 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Total = 6
@@ -35,7 +36,7 @@ function Write-Step([string]$msg) {
   Write-Host ""
   Write-Host "[$script:Step/$Total] $msg" -ForegroundColor Cyan
 }
-function Write-Ok([string]$msg)   { Write-Host "   OK  $msg" -ForegroundColor Green }
+function Write-Ok([string]$msg) { Write-Host "   OK  $msg" -ForegroundColor Green }
 function Write-Warn2([string]$msg) { Write-Host "   !!  $msg" -ForegroundColor Yellow }
 
 function Have-Cmd([string]$name) {
@@ -50,34 +51,31 @@ function Refresh-Path {
 
 function Ensure-Winget {
   if (Have-Cmd 'winget') { return $true }
-  Write-Warn2 "winget לא נמצא. התקן 'App Installer' מ-Microsoft Store, או התקן ידנית את הכלים."
+  Write-Warn2 "winget not found. Install 'App Installer' from the Microsoft Store, or install the tools manually."
   return $false
 }
 
 function Install-Prereq([string]$id, [string]$probeCmd, [string]$label) {
-  if (Have-Cmd $probeCmd) { Write-Ok "$label כבר מותקן"; return }
-  if (-not (Have-Cmd 'winget')) { Write-Warn2 "$label חסר ואין winget — התקן ידנית"; return }
-  Write-Host "   מתקין $label ..." -ForegroundColor Gray
+  if (Have-Cmd $probeCmd) { Write-Ok "$label already installed"; return }
+  if (-not (Have-Cmd 'winget')) { Write-Warn2 "$label missing and no winget - install it manually"; return }
+  Write-Host "   installing $label ..." -ForegroundColor Gray
   winget install --id $id -e --silent --accept-package-agreements --accept-source-agreements | Out-Null
   Refresh-Path
-  if (Have-Cmd $probeCmd) { Write-Ok "$label הותקן" } else { Write-Warn2 "$label — ייתכן שצריך לפתוח חלון חדש כדי לרענן PATH" }
+  if (Have-Cmd $probeCmd) { Write-Ok "$label installed" } else { Write-Warn2 "$label - open a new window to refresh PATH" }
 }
 
 function Ensure-ObsIni {
-  # Returns the OBS global.ini path, creating the folder + an empty file if OBS
-  # has never run (so websocket/dock can be pre-configured on a fresh machine).
   $ini = Join-Path $env:APPDATA 'obs-studio\global.ini'
   $dir = Split-Path -Parent $ini
   if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
   if (-not (Test-Path $ini)) {
     New-Item -ItemType File -Force -Path $ini | Out-Null
-    Write-Warn2 "נוצר global.ini ראשוני ל-OBS (OBS עדיין לא הורץ)"
+    Write-Warn2 "created a starter OBS global.ini (OBS has not run yet)"
   }
   return $ini
 }
 
 function Set-IniValues([string]$ini, [string]$section, [hashtable]$kv) {
-  # Set key=value pairs inside an INI [section], adding the section/keys if absent.
   $lines = [System.Collections.Generic.List[string]](Get-Content -LiteralPath $ini -Encoding UTF8)
   $secStart = -1
   for ($i = 0; $i -lt $lines.Count; $i++) {
@@ -104,15 +102,11 @@ function Set-IniValues([string]$ini, [string]$section, [hashtable]$kv) {
 }
 
 function Enable-ObsWebSocket([string]$ini) {
-  # Turn on the built-in obs-websocket server (port 4455, no password) so
-  # StudioMaster connects with zero manual OBS setup.
   Set-IniValues $ini 'OBSWebSocket' @{ ServerEnabled = 'true'; ServerPort = '4455'; AuthRequired = 'false'; FirstLoad = 'false' }
-  Write-Ok "obs-websocket הופעל (פורט 4455, ללא סיסמה) — יחול בהפעלת OBS"
+  Write-Ok "obs-websocket enabled (port 4455, no password) - applies when OBS starts"
 }
 
 function Add-ObsDock([string]$ini) {
-  # Registers http://127.0.0.1:3939/dock as an OBS Custom Browser Dock by
-  # merging into OBS global.ini. OBS must be CLOSED (it rewrites on exit).
   $url = 'http://127.0.0.1:3939/dock'
   $dock = [ordered]@{ title = 'StudioMaster'; url = $url }
   $lines = Get-Content -LiteralPath $ini -Encoding UTF8
@@ -121,7 +115,7 @@ function Add-ObsDock([string]$ini) {
     $line = $lines[$idx - 1]
     $json = $line.Substring($line.IndexOf('=') + 1)
     try { $arr = @($json | ConvertFrom-Json) } catch { $arr = @() }
-    if ($arr.url -contains $url) { Write-Ok "ה-Dock כבר רשום ב-OBS"; return }
+    if ($arr.url -contains $url) { Write-Ok "dock already registered in OBS"; return }
     $arr += [pscustomobject]$dock
     $lines[$idx - 1] = 'ExtraBrowserDocks=' + ($arr | ConvertTo-Json -Compress)
   } else {
@@ -134,16 +128,13 @@ function Add-ObsDock([string]$ini) {
     }
   }
   Set-Content -LiteralPath $ini -Value $lines -Encoding UTF8
-  Write-Ok "ה-Dock נוסף ל-OBS (ייראה אחרי הפעלה מחדש של OBS)"
+  Write-Ok "StudioMaster dock added to OBS (shows after OBS restarts)"
 }
 
 function New-Shortcut {
   $launcher = Join-Path $RepoRoot 'Start-StudioMaster.cmd'
-  @"
-@echo off
-cd /d "$RepoRoot"
-call npm run dev
-"@ | Set-Content -LiteralPath $launcher -Encoding ASCII
+  $body = "@echo off`r`ncd /d `"$RepoRoot`"`r`ncall npm run dev`r`n"
+  Set-Content -LiteralPath $launcher -Value $body -Encoding ASCII
   $desktop = [System.Environment]::GetFolderPath('Desktop')
   $lnk = Join-Path $desktop 'StudioMaster.lnk'
   $ws = New-Object -ComObject WScript.Shell
@@ -153,81 +144,81 @@ call npm run dev
   $sc.IconLocation = 'shell32.dll,3'
   $sc.Description = 'StudioMaster'
   $sc.Save()
-  Write-Ok "קיצור דרך נוצר על שולחן העבודה: StudioMaster"
+  Write-Ok "desktop shortcut created: StudioMaster"
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
+# -----------------------------------------------------------------------------
 
-Write-Host "StudioMaster — התקנה למחשב אחד (פיילוט)" -ForegroundColor White
-Write-Host "תיקיית הפרויקט: $RepoRoot" -ForegroundColor Gray
+Write-Host "StudioMaster - one-computer pilot install" -ForegroundColor White
+Write-Host "Project folder: $RepoRoot" -ForegroundColor Gray
 
 # 1) Prerequisites
-Write-Step "בדיקה והתקנה של תוכנות דרושות (Node, Python, ffmpeg, OBS)"
+Write-Step "Checking / installing prerequisites (Node, Python, ffmpeg, OBS)"
 if ($SkipPrereqs) {
-  Write-Warn2 "דילוג על התקנת prerequisites (-SkipPrereqs)"
+  Write-Warn2 "skipping prerequisite installs (-SkipPrereqs)"
 } else {
   Ensure-Winget | Out-Null
-  Install-Prereq 'OpenJS.NodeJS.LTS' 'node'   'Node.js'
+  Install-Prereq 'OpenJS.NodeJS.LTS' 'node' 'Node.js'
   Install-Prereq 'Python.Python.3.11' 'python' 'Python 3.11'
-  Install-Prereq 'Gyan.FFmpeg'        'ffmpeg' 'ffmpeg'
+  Install-Prereq 'Gyan.FFmpeg' 'ffmpeg' 'ffmpeg'
   Install-Prereq 'OBSProject.OBSStudio' 'obs64' 'OBS Studio'
 }
 
 # 2) App dependencies
-Write-Step "התקנת רכיבי StudioMaster (npm install + rebuild)"
+Write-Step "Installing StudioMaster (npm install + rebuild)"
 Push-Location $RepoRoot
 try {
   cmd /c "npm install" | Write-Host
-  Write-Ok "npm install הושלם"
-  try { cmd /c "npm run rebuild --workspace @studiomaster/desktop" | Write-Host; Write-Ok "better-sqlite3 נבנה ל-Electron" }
-  catch { Write-Warn2 "rebuild נכשל — האפליקציה תיפול ל-store בזיכרון (עדיין עובד)" }
+  Write-Ok "npm install done"
+  try { cmd /c "npm run rebuild --workspace @studiomaster/desktop" | Write-Host; Write-Ok "better-sqlite3 built for Electron" }
+  catch { Write-Warn2 "rebuild failed - app falls back to in-memory store (still works)" }
 } finally { Pop-Location }
 
 # 3) Python editing deps + Hebrew Whisper model
-Write-Step "התקנת סוכני העריכה + מודל התמלול העברי (עלול לקחת זמן, ~1.6GB)"
+Write-Step "Installing editing agents + Hebrew transcription model (may take a while, ~1.6GB)"
 if (Have-Cmd 'python') {
-  try { cmd /c "python -m pip install --user -r `"$RepoRoot\services\ai-workers\requirements.txt`"" | Write-Host } catch { Write-Warn2 "pip install נכשל — נסה ידנית" }
+  try { cmd /c "python -m pip install --user -r `"$RepoRoot\services\ai-workers\requirements.txt`"" | Write-Host } catch { Write-Warn2 "pip install failed - try manually later" }
   $reelsInstall = Join-Path $RepoRoot 'services\skills\podcast-reels-he\install.ps1'
   if (Test-Path $reelsInstall) {
-    Write-Host "   מריץ את התקנת סקיל הרילסים..." -ForegroundColor Gray
+    Write-Host "   running reels skill install..." -ForegroundColor Gray
     Push-Location (Split-Path -Parent $reelsInstall)
-    try { & $reelsInstall } catch { Write-Warn2 "install.ps1 של הרילס נכשל — אפשר להריץ אותו ידנית מאוחר יותר" }
+    try { & $reelsInstall } catch { Write-Warn2 "reels install.ps1 failed - run it manually later" }
     finally { Pop-Location }
   }
 } else {
-  Write-Warn2 "Python לא זמין — סוכני העריכה לא יותקנו כעת"
+  Write-Warn2 "Python not available - editing agents not installed now"
 }
 
-# 4) Build (optional)
-Write-Step "בניית האפליקציה"
+# 4) Build
+Write-Step "Building the application"
 Push-Location $RepoRoot
 try {
   if ($Build) {
     cmd /c "npm run dist:win" | Write-Host
-    Write-Ok "installer .exe נוצר תחת apps\desktop\release"
+    Write-Ok "installer .exe created under apps\desktop\release"
   } else {
     cmd /c "npm run build" | Write-Host
-    Write-Ok "האפליקציה נבנתה (הרצה עם הקיצור / npm run dev)"
+    Write-Ok "app built (launch via the shortcut / npm run dev)"
   }
 } finally { Pop-Location }
 
 # 5) OBS: enable websocket + register the dock
-Write-Step "הגדרת OBS: הפעלת WebSocket + רישום הפאנל (Custom Browser Dock)"
-Write-Warn2 "אם OBS פתוח — סגור אותו עכשיו כדי שהשינויים יישמרו."
+Write-Step "Configuring OBS: enable WebSocket + register the dock"
+Write-Warn2 "if OBS is open, close it now so the changes are saved."
 try {
   $obsIni = Ensure-ObsIni
   Enable-ObsWebSocket $obsIni
   Add-ObsDock $obsIni
-} catch { Write-Warn2 "לא ניתן לעדכן את OBS אוטומטית: $($_.Exception.Message)" }
+} catch { Write-Warn2 "could not update OBS automatically: $($_.Exception.Message)" }
 
 # 6) Shortcut
-Write-Step "יצירת קיצור דרך"
-try { New-Shortcut } catch { Write-Warn2 "יצירת קיצור נכשלה: $($_.Exception.Message)" }
+Write-Step "Creating a desktop shortcut"
+try { New-Shortcut } catch { Write-Warn2 "shortcut creation failed: $($_.Exception.Message)" }
 
 Write-Host ""
 Write-Host "==================================================" -ForegroundColor Green
-Write-Host " ההתקנה הושלמה! פשוט הפעל את 'StudioMaster' משולחן העבודה." -ForegroundColor Green
-Write-Host " OBS מוגדר אוטומטית: WebSocket דלוק (4455, ללא סיסמה) + הפאנל בפנים." -ForegroundColor Green
-Write-Host " מקור החיווי 'StudioMaster Marker' ייווצר אוטומטית בחיבור הראשון." -ForegroundColor Green
-Write-Host " מדריך מלא: docs\PILOT.md" -ForegroundColor Green
+Write-Host " Install complete! Launch 'StudioMaster' from the desktop." -ForegroundColor Green
+Write-Host " OBS is auto-configured: WebSocket on (4455, no password) + dock inside." -ForegroundColor Green
+Write-Host " The 'StudioMaster Marker' source is auto-created on first connect." -ForegroundColor Green
+Write-Host " Full guide: docs\PILOT.md" -ForegroundColor Green
 Write-Host "==================================================" -ForegroundColor Green
