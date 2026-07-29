@@ -71,7 +71,12 @@ export class ObsController extends EventEmitter {
       const { negotiatedRpcVersion, obsWebSocketVersion } = await this.obs.connect(
         params.url,
         params.password || undefined,
-        { eventSubscriptions: EventSubscription.All, rpcVersion: 1 },
+        {
+          // `All` intentionally omits the high-volume meter stream, so it must be
+          // OR'd in explicitly or the mixer meters never move (obs-websocket 5.x).
+          eventSubscriptions: EventSubscription.All | EventSubscription.InputVolumeMeters,
+          rpcVersion: 1,
+        },
       )
       this.setConnection({
         status: 'connected',
@@ -100,13 +105,17 @@ export class ObsController extends EventEmitter {
 
   async startRecord(): Promise<ObsRecordState> {
     await this.obs.call('StartRecord')
-    return this.refreshRecordState()
+    // Optimistic: OBS is briefly in the "starting" phase where GetRecordStatus
+    // may still report inactive. The RecordStateChanged event confirms shortly.
+    this.setRecord({ ...this.record, active: true, timecode: '00:00:00.000', timecodeMs: 0 })
+    return this.record
   }
 
   async stopRecord(): Promise<ObsRecordState> {
     const { outputPath } = await this.obs.call('StopRecord')
-    await this.refreshRecordState()
-    this.setRecord({ ...this.record, outputPath })
+    // Optimistic: during the stop-flush phase GetRecordStatus still reports
+    // active, which would leave the button stuck. Trust the command result.
+    this.setRecord({ ...this.record, active: false, outputPath })
     return this.record
   }
 
@@ -266,14 +275,15 @@ export class ObsController extends EventEmitter {
     })
 
     this.obs.on('RecordStateChanged', (data) => {
-      // OBS gives us the authoritative active flag here; timecode via poll.
-      const active = data.outputActive
+      // `outputActive` is the settled flag (true on STARTED, false on STOPPED).
+      // It is authoritative — do NOT re-poll GetRecordStatus here: during the
+      // stop-flush phase the poll still reports active and would clobber this
+      // back to true, leaving the record button stuck on "recording".
       this.setRecord({
         ...this.record,
-        active,
+        active: data.outputActive,
         outputPath: data.outputPath ?? this.record.outputPath,
       })
-      void this.refreshRecordState().catch(() => undefined)
     })
 
     this.obs.on('ConnectionClosed', () => {

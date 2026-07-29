@@ -144,14 +144,25 @@ function applyRecordLighting(): void {
   }
 }
 
+/** Flash the on-screen marker overlay in whatever scene is currently live. */
+async function flashMarkerOverlay(): Promise<void> {
+  // Ensure the source exists in the *current* scene (the user may have switched
+  // scenes since connect, where it was only added to the then-current one), then
+  // flash it — so the button always gives visible feedback on the OBS canvas.
+  await obs
+    .ensureMarkerOverlay(MARKER_OVERLAY_SOURCE, '✓ נרשם סימון')
+    .catch((err) => console.warn('[obs] ensure marker overlay failed:', err))
+  const scene = await obs.getCurrentSceneName().catch(() => null)
+  if (scene) await obs.flashSceneItem(scene, MARKER_OVERLAY_SOURCE).catch(() => undefined)
+}
+
 /** Drop a review marker at the current OBS timecode + flash the on-screen overlay. */
 function addMarker(category: ReviewMarkerCategory, note?: string) {
+  // Always flash for feedback, even when not recording, so the button is never dead.
+  void flashMarkerOverlay()
   const rec = obs.getRecordState()
   const marker = session.addMarker(category, rec.timecodeMs, note)
   if (!marker) return null
-  void obs.getCurrentSceneName().then((scene) => {
-    if (scene) void obs.flashSceneItem(scene, MARKER_OVERLAY_SOURCE)
-  })
   broadcast(IPC_EVENTS.markerAdded, marker)
   return marker
 }
