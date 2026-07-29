@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import { exec } from 'node:child_process'
 import { createConnection } from 'node:net'
+import { dirname } from 'node:path'
 import { promisify } from 'node:util'
 import type { LaunchStep } from '@studiomaster/shared'
 import type { Program } from '@studiomaster/shared'
@@ -149,7 +150,13 @@ function performanceNow(): number {
 export const defaultEffects: LauncherEffects = {
   spawn(program: Program): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Some Windows apps (notably OBS) resolve their data files relative to the
+      // current working directory, and fail hard when launched with an arbitrary
+      // one — OBS aborts with "Failed to find locale/en-US.ini". Launch every
+      // program with its own folder as the working directory, exactly as a
+      // Start-Menu shortcut would ("Start in": the executable's directory).
       const child = nodeSpawn(program.path, program.args ?? [], {
+        cwd: dirname(program.path),
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
