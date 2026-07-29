@@ -1,0 +1,8 @@
+# Windows batch files MUST use CRLF, or cmd.exe misparses them.
+# Store exact bytes (no EOL conversion) so both `git clone` and GitHub "Download
+# ZIP" deliver CRLF on Windows.
+*.cmd -text
+*.bat -text
+
+# PowerShell tolerates LF but prefer CRLF on Windows checkouts.
+*.ps1 text eol=crlf

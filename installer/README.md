@@ -36,6 +36,11 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
   `StudioMaster Marker` בסצנה הנוכחית (מוסתר — אפשר לעצב/למקם אותו כרצונך).
 - מדריך העבודה המלא: [`../docs/PILOT.md`](../docs/PILOT.md).
 
+## אם ה-`.cmd` לא רץ / שגיאת "is not recognized"
+הרץ את האשף ישירות דרך PowerShell (עוקף כל בעיית batch):
+1. פתח את תיקיית `installer`, לחיצה ימנית → **Open in Terminal**.
+2. הקלד: `powershell -ExecutionPolicy Bypass -File .\install.ps1`
+
 ## אם Windows חוסם (SmartScreen / Smart App Control)
 Windows חוסם קבצים לא-חתומים. **הפעל מהקיצור** (dev mode, electron חתום) ולא מה-`.exe`.
 אם קובץ נחסם: ימני → **Properties → Unblock**. אם קופץ SmartScreen: **More info → Run anyway**.
