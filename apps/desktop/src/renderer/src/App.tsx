@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { CloudView } from './views/CloudView.js'
 import { DashboardView } from './views/DashboardView.js'
 import { LiveView } from './views/LiveView.js'
+import { PodcastsView } from './views/PodcastsView.js'
 import { ProfilesView } from './views/ProfilesView.js'
 import { WizardView } from './views/WizardView.js'
 import { getLang, setLang, t } from './i18n.js'
 
-type View = 'wizard' | 'dashboard' | 'live' | 'cloud' | 'profiles'
+type View = 'wizard' | 'dashboard' | 'live' | 'cloud' | 'profiles' | 'podcasts'
 
 const NAV: { id: View; key: string }[] = [
   { id: 'wizard', key: 'nav.wizard' },
@@ -14,6 +15,7 @@ const NAV: { id: View; key: string }[] = [
   { id: 'live', key: 'nav.live' },
   { id: 'cloud', key: 'nav.cloud' },
   { id: 'profiles', key: 'nav.profiles' },
+  { id: 'podcasts', key: 'nav.podcasts' },
 ]
 
 export function App(): JSX.Element {
@@ -47,6 +49,7 @@ export function App(): JSX.Element {
         {view === 'live' && <LiveView />}
         {view === 'cloud' && <CloudView />}
         {view === 'profiles' && <ProfilesView />}
+        {view === 'podcasts' && <PodcastsView />}
       </main>
     </div>
   )

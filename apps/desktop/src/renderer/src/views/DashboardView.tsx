@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { msToTimecode, type ObsConnectionState, type ObsRecordState } from '@studiomaster/shared'
+import {
+  msToTimecode,
+  type ObsConnectionState,
+  type ObsRecordState,
+  type Podcast,
+} from '@studiomaster/shared'
+import { t } from '../i18n.js'
 
 const DEFAULT_URL = 'ws://127.0.0.1:4455'
 
@@ -21,6 +27,8 @@ export function DashboardView(): JSX.Element {
     timecodeMs: 0,
   })
   const [busy, setBusy] = useState(false)
+  const [podcasts, setPodcasts] = useState<Podcast[]>([])
+  const [activePodcast, setActivePodcast] = useState<string>('')
 
   useEffect(() => {
     void (async () => {
@@ -31,6 +39,10 @@ export function DashboardView(): JSX.Element {
       }
       setConnection(await window.studiomaster.obs.getConnectionState())
       setRecord(await window.studiomaster.obs.getRecordState())
+      const list = await window.studiomaster.podcasts.list()
+      setPodcasts(list)
+      const active = (await window.studiomaster.podcasts.getActive()) ?? list[0]?.id ?? ''
+      setActivePodcast(active)
     })()
 
     const offConn = window.studiomaster.onConnectionState(setConnection)
@@ -68,6 +80,11 @@ export function DashboardView(): JSX.Element {
     } finally {
       setBusy(false)
     }
+  }, [])
+
+  const handlePodcastChange = useCallback(async (id: string) => {
+    setActivePodcast(id)
+    await window.studiomaster.podcasts.setActive(id)
   }, [])
 
   return (
@@ -121,6 +138,25 @@ export function DashboardView(): JSX.Element {
 
       <section className="card">
         <h2>הקלטה</h2>
+        <div className="field">
+          <label htmlFor="podcast">{t('record.podcast')}</label>
+          {podcasts.length > 0 ? (
+            <select
+              id="podcast"
+              value={activePodcast}
+              onChange={(e) => handlePodcastChange(e.target.value)}
+              disabled={record.active}
+            >
+              {podcasts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="hint">{t('record.noPodcast')}</p>
+          )}
+        </div>
         <RecordTimecode record={record} />
         <div className="actions">
           <button

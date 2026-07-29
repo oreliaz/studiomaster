@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { ObsController } from '@studiomaster/obs-controller'
 import { createPtzController, type PtzController } from '@studiomaster/ptz-control'
@@ -8,7 +9,9 @@ import {
   type InputLevel,
   type ObsConnectionParams,
   type ObsConnectionState,
+  defaultDeliverables,
   type ObsRecordState,
+  type Podcast,
   type PtzMoveCommand,
   type PtzPresetCommand,
   type PtzZoomCommand,
@@ -28,10 +31,18 @@ import { startDockServer } from './dock.js'
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
 const ACTIVE_PROFILE_KEY = 'active.profile'
+const ACTIVE_PODCAST_KEY = 'active.podcast'
 const RUN_MODE_KEY = 'run.mode'
 
+/** Global default treatment timing (used when a session has no podcast). */
 function getRunMode(): RunMode {
   return (store.getSetting(RUN_MODE_KEY) as RunMode) || 'ask'
+}
+
+/** Resolve the post-recording treatment timing for a session: podcast first. */
+function sessionRunMode(podcastId?: string): RunMode {
+  const podcast = podcastId ? store.getPodcast(podcastId) : null
+  return podcast?.runMode ?? getRunMode()
 }
 
 const store = createStore()
@@ -57,6 +68,40 @@ function broadcast<T>(channel: string, payload: T): void {
 function activeProfile(): StudioProfile | null {
   const id = store.getSetting(ACTIVE_PROFILE_KEY)
   return id ? store.getProfile(id) : null
+}
+
+/**
+ * One-time migration for the Studio↔Podcast split: earlier versions kept the
+ * deliverables questionnaire on the studio profile. Seed a Podcast per existing
+ * profile from its embedded deliverables so no configuration is lost, and make
+ * sure at least one podcast exists to record against.
+ */
+function migratePodcasts(): void {
+  if (store.listPodcasts().length > 0) return
+  const profiles = store.listProfiles()
+  let firstId: string | null = null
+  for (const profile of profiles) {
+    if (!profile.deliverables) continue
+    const podcast: Podcast = {
+      id: randomUUID(),
+      name: profile.name,
+      deliverables: profile.deliverables,
+      runMode: getRunMode(),
+    }
+    store.savePodcast(podcast)
+    firstId ??= podcast.id
+  }
+  if (!firstId) {
+    const fallback: Podcast = {
+      id: randomUUID(),
+      name: 'פודקאסט ברירת מחדל',
+      deliverables: defaultDeliverables(),
+      runMode: getRunMode(),
+    }
+    store.savePodcast(fallback)
+    firstId = fallback.id
+  }
+  if (!store.getSetting(ACTIVE_PODCAST_KEY)) store.setSetting(ACTIVE_PODCAST_KEY, firstId)
 }
 
 /** Rebuild the PTZ controller lazily when the active profile changes. */
@@ -86,7 +131,10 @@ obs.on('levels', (levels: InputLevel[]) => broadcast(IPC_EVENTS.mixerLevels, lev
 obs.on('record', (state: ObsRecordState) => {
   broadcast(IPC_EVENTS.obsRecord, state)
   if (state.active && !session.session) {
-    session.start(store.getSetting(ACTIVE_PROFILE_KEY) ?? undefined)
+    session.start(
+      store.getSetting(ACTIVE_PROFILE_KEY) ?? undefined,
+      store.getSetting(ACTIVE_PODCAST_KEY) ?? undefined,
+    )
     applyRecordLighting()
   } else if (!state.active && session.session) {
     const finished = session.session.id
@@ -99,8 +147,8 @@ obs.on('record', (state: ObsRecordState) => {
 /** On record stop: store the capture, recognize the session, and queue/run editing. */
 async function afterRecordingStopped(sessionId: string, capturePath?: string): Promise<void> {
   const record = store.getSession(sessionId)
+  const mode = sessionRunMode(record?.podcastId)
   if (record) {
-    const mode = getRunMode()
     store.saveSession({
       ...record,
       capturePath: capturePath ?? record.capturePath,
@@ -108,7 +156,7 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
     })
   }
   await cloud.recognizeSession(sessionId).catch(() => undefined)
-  if (getRunMode() === 'now') {
+  if (mode === 'now') {
     await ai.processSession(sessionId).catch((err) => console.error('[ai] run-now failed:', err))
   }
 }
@@ -116,10 +164,13 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
 /** Nightly editor: while in the 00:00–08:00 window, drain pending edit jobs one at a time. */
 let nightlyRunning = false
 async function nightlyTick(): Promise<void> {
-  if (nightlyRunning || getRunMode() !== 'nightly') return
+  if (nightlyRunning) return
   const hour = new Date().getHours()
   if (hour >= 8) return
-  const pending = store.listSessions().find((s) => s.editStatus === 'pending')
+  // Only sessions whose podcast (or the global default) opted into nightly.
+  const pending = store
+    .listSessions()
+    .find((s) => s.editStatus === 'pending' && sessionRunMode(s.podcastId) === 'nightly')
   if (!pending) return
   nightlyRunning = true
   try {
@@ -182,11 +233,22 @@ function registerIpc(): void {
   ipcMain.handle('obs:get-record-state', () => obs.getRecordState())
   ipcMain.handle('obs:get-saved-connection', () => store.getSavedConnection())
 
-  // Profiles
+  // Profiles (studios / equipment)
   ipcMain.handle('profiles:list', () => store.listProfiles())
   ipcMain.handle('profiles:get', (_e, id: string) => store.getProfile(id))
   ipcMain.handle('profiles:save', (_e, profile: StudioProfile) => store.saveProfile(profile))
   ipcMain.handle('profiles:remove', (_e, id: string) => store.deleteProfile(id))
+
+  // Podcasts (shows / deliverables)
+  ipcMain.handle('podcasts:list', () => store.listPodcasts())
+  ipcMain.handle('podcasts:get', (_e, id: string) => store.getPodcast(id))
+  ipcMain.handle('podcasts:save', (_e, podcast: Podcast) => store.savePodcast(podcast))
+  ipcMain.handle('podcasts:remove', (_e, id: string) => {
+    store.deletePodcast(id)
+    if (store.getSetting(ACTIVE_PODCAST_KEY) === id) store.setSetting(ACTIVE_PODCAST_KEY, '')
+  })
+  ipcMain.handle('podcasts:get-active', () => store.getSetting(ACTIVE_PODCAST_KEY) || null)
+  ipcMain.handle('podcasts:set-active', (_e, id: string) => store.setSetting(ACTIVE_PODCAST_KEY, id))
 
   // Wizard
   ipcMain.handle('wizard:start', async (_e, profileId: string) => {
@@ -301,6 +363,7 @@ app.whenReady().then(() => {
     const withCams = store.listProfiles().find((p) => p.cameras.length > 0)
     if (withCams) store.setSetting(ACTIVE_PROFILE_KEY, withCams.id)
   }
+  migratePodcasts()
   registerIpc()
   registerHotkeys()
   createWindow()

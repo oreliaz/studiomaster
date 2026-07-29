@@ -33,7 +33,7 @@ export class RecordingSessionManager {
     return this.current
   }
 
-  start(profileId?: string): RecordingSession {
+  start(profileId?: string, podcastId?: string): RecordingSession {
     const startedAt = new Date().toISOString()
     const stamp = startedAt.replace(/[:.]/g, '-')
     const storagePath = join(app.getPath('userData'), 'recordings', stamp)
@@ -44,6 +44,7 @@ export class RecordingSessionManager {
       startedAt,
       storagePath,
       profileId,
+      podcastId,
       guests: [],
       uploaded: false,
     })

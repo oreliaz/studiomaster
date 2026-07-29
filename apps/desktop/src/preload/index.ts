@@ -5,6 +5,7 @@ import {
   type ObsConnectionParams,
   type ObsConnectionState,
   type ObsRecordState,
+  type Podcast,
   type PtzMoveCommand,
   type PtzPresetCommand,
   type PtzZoomCommand,
@@ -39,6 +40,14 @@ const api: StudioMasterApi = {
     get: (id: string) => ipcRenderer.invoke('profiles:get', id),
     save: (profile: StudioProfile) => ipcRenderer.invoke('profiles:save', profile),
     remove: (id: string) => ipcRenderer.invoke('profiles:remove', id),
+  },
+  podcasts: {
+    list: () => ipcRenderer.invoke('podcasts:list'),
+    get: (id: string) => ipcRenderer.invoke('podcasts:get', id),
+    save: (podcast: Podcast) => ipcRenderer.invoke('podcasts:save', podcast),
+    remove: (id: string) => ipcRenderer.invoke('podcasts:remove', id),
+    getActive: () => ipcRenderer.invoke('podcasts:get-active'),
+    setActive: (id: string) => ipcRenderer.invoke('podcasts:set-active', id),
   },
   wizard: {
     start: (profileId: string) => ipcRenderer.invoke('wizard:start', profileId),

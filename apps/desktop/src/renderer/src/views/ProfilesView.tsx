@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react'
-import type {
-  CaptureConfig,
-  DeliverableTemplate,
-  LightingConfig,
-  Program,
-  StudioProfile,
-} from '@studiomaster/shared'
+import type { CaptureConfig, LightingConfig, Program, StudioProfile } from '@studiomaster/shared'
 import {
   WAIT_FOR_LABELS,
   joinWaitFor,
@@ -104,11 +98,7 @@ export function ProfilesView(): JSX.Element {
     patchLighting({ cues })
   }
 
-  // ── deliverables questionnaire ──
-  const patchDeliverables = (patch: Partial<DeliverableTemplate>): void => {
-    if (!draft) return
-    patchDraft({ deliverables: { ...draft.deliverables, ...patch } })
-  }
+  // ── recording (equipment) options ──
   const patchCapture = (patch: Partial<CaptureConfig>): void => {
     if (!draft) return
     patchDraft({ capture: { ...draft.capture, ...patch } })
@@ -247,91 +237,8 @@ export function ProfilesView(): JSX.Element {
             </section>
 
             <section className="card">
-              <h2>{t('q.title')}</h2>
-              <div className="grid2">
-                <div className="field">
-                  <label>{t('q.editType')}</label>
-                  <select
-                    value={draft.deliverables.editType}
-                    onChange={(e) =>
-                      patchDeliverables({
-                        editType: e.target.value as DeliverableTemplate['editType'],
-                      })
-                    }
-                  >
-                    <option value="none">{t('editType.none')}</option>
-                    <option value="basic">{t('editType.basic')}</option>
-                    <option value="reels">{t('editType.reels')}</option>
-                    <option value="both">{t('editType.both')}</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>{t('q.language')}</label>
-                  <select
-                    value={draft.deliverables.language}
-                    onChange={(e) =>
-                      patchDeliverables({
-                        language: e.target.value as DeliverableTemplate['language'],
-                      })
-                    }
-                  >
-                    <option value="he">עברית</option>
-                    <option value="en">English</option>
-                  </select>
-                </div>
-              </div>
-
-              {(draft.deliverables.editType === 'basic' ||
-                draft.deliverables.editType === 'both') && (
-                <div className="grid2">
-                  <div className="field">
-                    <label>{t('q.intro')}</label>
-                    <input
-                      value={draft.deliverables.intro ?? ''}
-                      onChange={(e) => patchDeliverables({ intro: e.target.value || undefined })}
-                      placeholder="C:/assets/intro.mp4"
-                    />
-                  </div>
-                  <div className="field">
-                    <label>{t('q.outro')}</label>
-                    <input
-                      value={draft.deliverables.outro ?? ''}
-                      onChange={(e) => patchDeliverables({ outro: e.target.value || undefined })}
-                      placeholder="C:/assets/outro.mp4"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {(draft.deliverables.editType === 'reels' ||
-                draft.deliverables.editType === 'both') && (
-                <div className="grid2">
-                  <div className="field">
-                    <label>{t('q.reelsCount')}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={draft.deliverables.reelsCount}
-                      onChange={(e) => patchDeliverables({ reelsCount: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="field">
-                    <label>{t('q.reelStyle')}</label>
-                    <select
-                      value={draft.deliverables.reelStyle}
-                      onChange={(e) =>
-                        patchDeliverables({
-                          reelStyle: e.target.value as DeliverableTemplate['reelStyle'],
-                        })
-                      }
-                    >
-                      <option value="simple">{t('style.simple')}</option>
-                      <option value="premium">{t('style.premium')}</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
+              <h2>{t('rec.title')}</h2>
+              <p className="hint">{t('rec.hint')}</p>
               <div className="checks-row">
                 <label className="check">
                   <input
@@ -348,14 +255,6 @@ export function ProfilesView(): JSX.Element {
                     onChange={(e) => patchCapture({ routed: e.target.checked })}
                   />
                   {t('q.routed')}
-                </label>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={draft.deliverables.socialUpload}
-                    onChange={(e) => patchDeliverables({ socialUpload: e.target.checked })}
-                  />
-                  {t('q.socialUpload')}
                 </label>
               </div>
             </section>

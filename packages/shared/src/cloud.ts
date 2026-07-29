@@ -26,6 +26,8 @@ export interface SessionSummary {
   endedAt?: string
   storagePath: string
   profileId?: string
+  /** The Podcast (show) this episode belongs to — drives editing deliverables. */
+  podcastId?: string
   calendarEventId?: string
   guests: string[]
   uploaded: boolean

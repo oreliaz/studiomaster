@@ -24,11 +24,14 @@ export class AiEditor {
     const session = this.store.getSession(sessionId)
     if (!session) return { sessionId, ok: false, error: 'הפגישה לא נמצאה' }
 
+    // Deliverables come from the Podcast (show). Fall back to a profile's
+    // legacy embedded deliverables for sessions recorded before the split.
+    const podcast = session.podcastId ? this.store.getPodcast(session.podcastId) : null
     const profile = session.profileId ? this.store.getProfile(session.profileId) : null
     const job = {
       sessionId,
       capturePath: session.capturePath ?? '',
-      deliverables: profile?.deliverables ?? {},
+      deliverables: podcast?.deliverables ?? profile?.deliverables ?? {},
     }
 
     try {

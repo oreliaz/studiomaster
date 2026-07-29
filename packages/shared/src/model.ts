@@ -88,14 +88,30 @@ export const deliverableTemplateSchema = z.object({
 })
 export type DeliverableTemplate = z.infer<typeof deliverableTemplateSchema>
 
-/** Recording/routing options chosen in the questionnaire. */
+/** A fully-defaulted deliverables template (schema defaults applied). */
+export function defaultDeliverables(): DeliverableTemplate {
+  return deliverableTemplateSchema.parse({})
+}
+
+/** Recording/routing options — an equipment property of the studio. */
 export const captureConfigSchema = z.object({
+  /** Record each microphone to its own OBS audio track and split after stop. */
   multitrack: z.boolean().default(false),
   separateChannels: z.boolean().default(false),
   routed: z.boolean().default(true),
 })
 export type CaptureConfig = z.infer<typeof captureConfigSchema>
 
+/** When the autonomous editor runs after a recording (mirrors cloud.RunMode). */
+export const runModeSchema = z.enum(['ask', 'now', 'nightly'])
+
+/**
+ * A **Studio** = a physical room and its equipment + startup sequence
+ * (requirement 1). What programs to open and in what order, lighting, PTZ
+ * cameras, and how audio is captured. Equipment-level only — *what* gets
+ * produced from a recording lives on the Podcast, so one studio can host many
+ * different shows. `deliverables` is retained for migration of old profiles.
+ */
 export const studioProfileSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -104,11 +120,27 @@ export const studioProfileSchema = z.object({
   obs: obsConfigSchema.default({ audioTracks: {} }),
   cameras: z.array(cameraSchema).default([]),
   capture: captureConfigSchema.default({}),
-  deliverables: deliverableTemplateSchema.default({}),
+  /** @deprecated moved to Podcast; kept so existing profiles migrate cleanly. */
+  deliverables: deliverableTemplateSchema.optional(),
   /** Guided wizard steps that need a human eye. */
   checklist: z.array(z.string()).default([]),
 })
 export type StudioProfile = z.infer<typeof studioProfileSchema>
+
+/**
+ * A **Podcast** (show) = a reusable deliverables profile: content language,
+ * intro/outro, edit type, reels, and *when* the autonomous editor runs. Chosen
+ * at record time, independent of which studio the episode is recorded in, so
+ * the same show produces the same outputs wherever it's shot.
+ */
+export const podcastSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  deliverables: deliverableTemplateSchema.default({}),
+  /** Post-recording treatment timing for this show. */
+  runMode: runModeSchema.default('ask'),
+})
+export type Podcast = z.infer<typeof podcastSchema>
 
 // ─── Session & media ─────────────────────────────────────────────────────────
 

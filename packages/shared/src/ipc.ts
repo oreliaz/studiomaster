@@ -1,4 +1,4 @@
-import type { ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.js'
+import type { Podcast, ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.js'
 import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
@@ -44,6 +44,15 @@ export interface StudioMasterApi {
     get(id: string): Promise<StudioProfile | null>
     save(profile: StudioProfile): Promise<StudioProfile>
     remove(id: string): Promise<void>
+  }
+  podcasts: {
+    list(): Promise<Podcast[]>
+    get(id: string): Promise<Podcast | null>
+    save(podcast: Podcast): Promise<Podcast>
+    remove(id: string): Promise<void>
+    /** The show currently selected for recording (persisted). */
+    getActive(): Promise<string | null>
+    setActive(id: string): Promise<void>
   }
   wizard: {
     start(profileId: string): Promise<WizardState>

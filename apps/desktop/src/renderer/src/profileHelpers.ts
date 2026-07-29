@@ -1,4 +1,4 @@
-import type { Program, StudioProfile } from '@studiomaster/shared'
+import type { DeliverableTemplate, Podcast, Program, StudioProfile } from '@studiomaster/shared'
 
 /** UI-friendly decomposition of the `waitFor` string. */
 export type WaitForType = 'spawn' | 'websocket' | 'delay' | 'port' | 'window'
@@ -47,17 +47,30 @@ export function newProfile(): StudioProfile {
     obs: { audioTracks: {} },
     cameras: [],
     capture: { multitrack: false, separateChannels: false, routed: true },
-    deliverables: {
-      editType: 'basic',
-      language: 'he',
-      targetLufs: -16,
-      reelsCount: 15,
-      reelStyle: 'simple',
-      reelMinSec: 40,
-      reelMaxSec: 70,
-      socialUpload: false,
-    },
     checklist: [],
+  }
+}
+
+/** Default deliverables for a new podcast (matches the schema defaults). */
+export function newDeliverables(): DeliverableTemplate {
+  return {
+    editType: 'basic',
+    language: 'he',
+    targetLufs: -16,
+    reelsCount: 15,
+    reelStyle: 'simple',
+    reelMinSec: 40,
+    reelMaxSec: 70,
+    socialUpload: false,
+  }
+}
+
+export function newPodcast(): Podcast {
+  return {
+    id: crypto.randomUUID(),
+    name: 'פודקאסט חדש',
+    deliverables: newDeliverables(),
+    runMode: 'ask',
   }
 }
 

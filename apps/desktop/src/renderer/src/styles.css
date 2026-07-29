@@ -416,6 +416,12 @@ body {
   color: var(--text);
 }
 
+/* A checkbox sitting in a grid cell next to a field — align to the row. */
+.check--standalone {
+  align-self: end;
+  margin-bottom: 10px;
+}
+
 /* ── steps / checklist ── */
 .steps,
 .checklist {

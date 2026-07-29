@@ -2,8 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
 import {
+  podcastSchema,
   studioProfileSchema,
   type ObsConnectionParams,
+  type Podcast,
   type ReviewMarker,
   type SessionSummary,
   type StudioProfile,
@@ -26,6 +28,10 @@ export interface Store {
   getProfile(id: string): StudioProfile | null
   saveProfile(profile: StudioProfile): StudioProfile
   deleteProfile(id: string): void
+  listPodcasts(): Podcast[]
+  getPodcast(id: string): Podcast | null
+  savePodcast(podcast: Podcast): Podcast
+  deletePodcast(id: string): void
   addMarker(marker: ReviewMarker): void
   listMarkers(sessionId?: string): ReviewMarker[]
   updateMarkerNote(id: string, note: string): void
@@ -37,16 +43,25 @@ export interface Store {
 interface DbShape {
   settings: Record<string, string>
   profiles: Record<string, StudioProfile>
+  podcasts: Record<string, Podcast>
   markers: ReviewMarker[]
   sessions: Record<string, SessionSummary>
 }
 
-const EMPTY: DbShape = { settings: {}, profiles: {}, markers: [], sessions: {} }
+const EMPTY: DbShape = { settings: {}, profiles: {}, podcasts: {}, markers: [], sessions: {} }
 const OBS_CONNECTION_KEY = 'obs.connection'
 
 function parseProfile(profile: StudioProfile): StudioProfile | null {
   try {
     return studioProfileSchema.parse(profile)
+  } catch {
+    return null
+  }
+}
+
+function parsePodcast(podcast: Podcast): Podcast | null {
+  try {
+    return podcastSchema.parse(podcast)
   } catch {
     return null
   }
@@ -124,6 +139,27 @@ class JsonFileStore implements Store {
     this.save()
   }
 
+  listPodcasts(): Podcast[] {
+    return Object.values(this.data.podcasts)
+      .map(parsePodcast)
+      .filter((p): p is Podcast => p !== null)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }
+  getPodcast(id: string): Podcast | null {
+    const p = this.data.podcasts[id]
+    return p ? parsePodcast(p) : null
+  }
+  savePodcast(podcast: Podcast): Podcast {
+    const validated = podcastSchema.parse(podcast)
+    this.data.podcasts[validated.id] = validated
+    this.save()
+    return validated
+  }
+  deletePodcast(id: string): void {
+    delete this.data.podcasts[id]
+    this.save()
+  }
+
   addMarker(marker: ReviewMarker): void {
     this.data.markers.push(marker)
     this.save()
@@ -160,6 +196,7 @@ class JsonFileStore implements Store {
 class MemoryStore implements Store {
   private readonly settings = new Map<string, string>()
   private readonly profiles = new Map<string, StudioProfile>()
+  private readonly podcasts = new Map<string, Podcast>()
   private readonly markers: ReviewMarker[] = []
   private readonly sessions = new Map<string, SessionSummary>()
 
@@ -189,6 +226,20 @@ class MemoryStore implements Store {
   }
   deleteProfile(id: string): void {
     this.profiles.delete(id)
+  }
+  listPodcasts(): Podcast[] {
+    return [...this.podcasts.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }
+  getPodcast(id: string): Podcast | null {
+    return this.podcasts.get(id) ?? null
+  }
+  savePodcast(podcast: Podcast): Podcast {
+    const validated = podcastSchema.parse(podcast)
+    this.podcasts.set(validated.id, validated)
+    return validated
+  }
+  deletePodcast(id: string): void {
+    this.podcasts.delete(id)
   }
   addMarker(marker: ReviewMarker): void {
     this.markers.push(marker)
