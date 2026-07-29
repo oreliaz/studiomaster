@@ -2,14 +2,18 @@ import { resolve } from 'node:path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
-// Workspace packages are consumed as TypeScript source and must be bundled,
-// so they are excluded from dependency externalization.
+// Excluded from dependency externalization = bundled into the main process.
+// - the workspace packages are consumed as TypeScript source, so must be bundled.
+// - obs-websocket-js is an ESM package with a default export; if left external
+//   and required from the CJS main bundle, the default import resolves to the
+//   namespace ("OBSWebSocket is not a constructor"), so we bundle it instead.
 const bundledWorkspaceDeps = [
   '@studiomaster/shared',
   '@studiomaster/obs-controller',
   '@studiomaster/studio-launcher',
   '@studiomaster/lighting',
   '@studiomaster/ptz-control',
+  'obs-websocket-js',
 ]
 
 const alias = {
