@@ -49,8 +49,12 @@ npm run dist:win       # מייצר installer (NSIS) ל-Windows עם electron-bu
 
 ```bash
 pip install -r services/ai-workers/requirements.txt   # whisper + anthropic (אופציונליים)
-export ANTHROPIC_API_KEY=...                           # לתכנון EDL עם Claude (אחרת: fallback דטרמיניסטי)
+export ANTHROPIC_API_KEY=...                           # לתכנון EDL + בחירת קליפים חכמה לרילסים
 ```
+
+עם `ANTHROPIC_API_KEY` מוגדר, בחירת הקליפים לרילס נעשית ע"י Claude שקורא את התמלול המתוזמן
+ובוחר קליפים שמתחילים בהוק, עצמאיים, וממוקמים על גבולות משפטים. בלי המפתח — נפילה אוטומטית
+לבחירה לפי סמני ההדגשה + פיזור אחיד (ראה `ai_workers/reels_select.py`).
 
 ## מבנה
 

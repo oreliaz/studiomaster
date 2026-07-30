@@ -29,6 +29,7 @@ from pathlib import Path
 from .cuts import markers_to_cuts_txt
 from .models import Marker
 from .reels_plan import propose_specs, spec_to_arg
+from .reels_select import ClipPick, load_transcript, select_clips
 
 SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
 BASIC_SKILL = SKILLS_DIR / "basic-editing-he"
@@ -140,6 +141,38 @@ def _hook_for(markers: list[Marker], start_s: float, end_s: float) -> str:
     return fallback
 
 
+def _plan_clips(
+    work: Path, markers: list[Marker], duration_ms: int, count: int, min_s: int, max_s: int,
+    deliverables: dict,
+) -> tuple[list[tuple[int, float, float, str]], dict[int, str], str]:
+    """Choose clip windows: model-based from the transcript, else marker-driven.
+
+    Returns (specs, hooks_by_index, selection_mode). The model reads the timed
+    transcript for hook-first, self-contained boundaries; on any miss it falls
+    back to the deterministic marker+uniform planner so cutting never blocks.
+    """
+    transcript_json = work / "transcript.json"
+    if transcript_json.exists():
+        try:
+            segments, dur_s = load_transcript(str(transcript_json))
+            picks: list[ClipPick] | None = select_clips(
+                segments, dur_s or duration_ms / 1000, count, min_s, max_s,
+                deliverables.get("language", "he"),
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[reels] transcript-based selection failed: {exc}", flush=True)
+            picks = None
+        if picks:
+            specs = [(i, p.start_s, p.end_s, p.slug or f"clip{i:02d}")
+                     for i, p in enumerate(picks, start=1)]
+            hooks = {i: p.hook for i, p in enumerate(picks, start=1)}
+            return specs, hooks, "model"
+
+    specs = propose_specs(markers, duration_ms, count, min_s, max_s)
+    hooks = {s[0]: _hook_for(markers, s[1], s[2]) for s in specs}
+    return specs, hooks, "markers"
+
+
 def _render_clip(clip: Path, captions: Path, out: Path, hook: str, premium: bool) -> dict:
     """Render one reel with captions + graphics. Premium falls back to simple."""
     if premium:
@@ -169,15 +202,17 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     count = int(d.get("reelsCount", 15))
     style = d.get("reelStyle", "simple")
     premium = style == "premium"
+    min_s = int(d.get("reelMinSec", 40))
+    max_s = int(d.get("reelMaxSec", 70))
     duration = _probe_duration_ms(capture) or (max((m.tc_ms for m in markers), default=0) + 60_000)
-    specs = propose_specs(markers, duration, count, int(d.get("reelMinSec", 40)),
-                          int(d.get("reelMaxSec", 70)))
-    (work / "reel_specs.txt").write_text(
-        "\n".join(spec_to_arg(s) for s in specs) + ("\n" if specs else ""), "utf-8"
-    )
+
     if dry_run:
+        specs = propose_specs(markers, duration, count, min_s, max_s)
+        (work / "reel_specs.txt").write_text(
+            "\n".join(spec_to_arg(s) for s in specs) + ("\n" if specs else ""), "utf-8"
+        )
         return {"skill": "podcast-reels-he", "dry_run": True, "style": style,
-                "planned_clips": len(specs), "steps": [], "outputs": []}
+                "planned_clips": len(specs), "selection": "markers", "steps": [], "outputs": []}
 
     steps: list[dict] = []
     clips_dir = work / "clips"
@@ -187,13 +222,22 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     out_dir.mkdir(exist_ok=True)
     whisper_env = {"CT2_FORCE_CPU_ISA": "GENERIC"}
 
-    # 1) full-episode transcript (reference) + 2) cut the selected clips.
+    # 1) full-episode transcript (drives smart clip selection + reference).
     emit("reels-transcribe", base + span * 0.05, "מתמלל את הפרק")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "transcribe_full.py"),
               str(capture), str(work / "transcript.txt")], env=whisper_env)
     )
-    emit("reels-cut", base + span * 0.3, f"חותך {len(specs)} קליפים")
+
+    # 2) choose clip windows: model-based from the transcript, else marker-driven.
+    emit("reels-select", base + span * 0.32, "בוחר קליפים חכמים לפי התמלול")
+    specs, hooks, selection = _plan_clips(work, markers, duration, count, min_s, max_s, d)
+    (work / "reel_specs.txt").write_text(
+        "\n".join(spec_to_arg(s) for s in specs) + ("\n" if specs else ""), "utf-8"
+    )
+
+    # 3) cut the selected clips.
+    emit("reels-cut", base + span * 0.38, f"חותך {len(specs)} קליפים")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "cut_clips.py"), str(capture),
               str(clips_dir)] + [spec_to_arg(s) for s in specs])
@@ -201,30 +245,28 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
 
     clip_files = sorted(clips_dir.glob("*.mp4")) if clips_dir.exists() else []
 
-    # 3) word-level transcription of the SHORT clips (input for captions).
+    # 4) word-level transcription of the SHORT clips (input for captions).
     emit("reels-words", base + span * 0.45, "מתמלל מילים לכתוביות")
     if clip_files:
         steps.append(
             _run(["python", str(REELS_SKILL / "scripts" / "transcribe_words.py"),
                   str(words_dir)] + [str(c) for c in clip_files], env=whisper_env)
         )
-    # 4) group words into caption files (captions/<NN>.json).
+    # 5) group words into caption files (captions/<NN>.json).
     emit("reels-captions", base + span * 0.55, "בונה כתוביות")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "build_captions.py"), "build", str(work),
               str(REELS_SKILL / "fixes" / "fixes_he.json")])
     )
 
-    # 5) render each clip WITH captions + graphics, in the chosen style.
+    # 6) render each clip WITH captions + graphics, in the chosen style.
     style_label = "כריסלייט" if premium else "פשוט"
     renders: list[dict] = []
     for i, clip in enumerate(clip_files):
         nn = clip.name[:2]
         captions = captions_dir / f"{nn}.json"
         out = out_dir / f"{nn}.mp4"
-        # Map this clip back to its spec window to pick a hook line from markers.
-        spec = next((s for s in specs if f"{s[0]:02d}" == nn), None)
-        hook = _hook_for(markers, spec[1], spec[2]) if spec else ""
+        hook = hooks.get(int(nn), "") if nn.isdigit() else ""
         frac = base + span * (0.6 + 0.38 * ((i + 1) / max(1, len(clip_files))))
         emit("reels-render", frac, f"מרנדר רילס {i + 1} מתוך {len(clip_files)} ({style_label})")
         if captions.exists():
@@ -236,7 +278,7 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     outputs = sorted(str(p) for p in out_dir.glob("*.mp4"))
     emit("reels-done", base + span, f"{len(outputs)} רילסים מוכנים")
     return {"skill": "podcast-reels-he", "style": style, "premium": premium,
-            "planned_clips": len(specs), "rendered": len(outputs),
+            "selection": selection, "planned_clips": len(specs), "rendered": len(outputs),
             "steps": steps, "outputs": outputs}
 
 

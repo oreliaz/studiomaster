@@ -130,9 +130,17 @@ function summarize(summary: Record<string, unknown> | undefined): string {
   const parts: string[] = [`עריכה: ${type}`]
   const basic = summary['basic'] as { output?: string } | null
   if (basic?.output) parts.push('פרק מלא ✓')
-  const reels = summary['reels'] as { planned_clips?: number; rendered?: number } | null
-  if (reels?.rendered) parts.push(`${reels.rendered} רילסים ✓`)
-  else if (reels?.planned_clips) parts.push(`${reels.planned_clips} רילסים (מתוכננים)`)
+  const reels = summary['reels'] as {
+    planned_clips?: number
+    rendered?: number
+    selection?: string
+  } | null
+  if (reels?.rendered) {
+    const how = reels.selection === 'model' ? ' (בחירה חכמה)' : ''
+    parts.push(`${reels.rendered} רילסים ✓${how}`)
+  } else if (reels?.planned_clips) {
+    parts.push(`${reels.planned_clips} רילסים (מתוכננים)`)
+  }
   if (summary['error']) parts.push(`שגיאה: ${summary['error']}`)
   return parts.join(' · ')
 }

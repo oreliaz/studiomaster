@@ -125,10 +125,10 @@ Windows חוסם קבצים לא-חתומים (אין לנו עדיין תעוד
 - **לטווח ארוך:** חתימת קוד (EV/OV certificate) מסירה את החסימות בהפצה. לא נדרש לפיילוט.
 
 ## מגבלות ידועות בפיילוט · Known pilot limits
-- **גבולות הקליפים** לרילס נגזרים כרגע מסמני ההדגשה + פיזור אחיד (עדיין לא בחירה חכמה
-  מבוססת-תמלול עם מודל — לכן קליפ עלול להתחיל/להסתיים באמצע משפט). *סמן הדגשה (Ctrl+Shift+2)
-  על רגעים חזקים משפר משמעותית את החיתוך.* *(Reel boundaries are marker-driven + uniform
-  spread; transcript-aware model selection is the next step. Use highlight markers.)*
+- **בחירת קליפים לרילס**: עם `ANTHROPIC_API_KEY` מוגדר — Claude קורא את התמלול המתוזמן ובוחר
+  קליפים שמתחילים בהוק, עצמאיים, וממוקמים על גבולות משפטים (בחירה חכמה). בלי מפתח — נפילה
+  אוטומטית לבחירה לפי סמני ההדגשה + פיזור אחיד (אז סמן הדגשה ב-Ctrl+Shift+2 על רגעים חזקים
+  משפר את החיתוך). *(Smart transcript-based selection with an API key; marker fallback otherwise.)*
 - סגנון **פרימיום (כריסלייט)** דורש שמנוע ה-Node של הסקיל יותקן (אשף ההתקנה של הרילס עושה
   זאת: puppeteer + Chrome). אם הרינדור הפרימיום נכשל, המערכת נופלת אוטומטית לסגנון **פשוט**
   עם כתוביות, כדי שתמיד יתקבלו רילסים. *(Premium falls back to captioned simple if the Node
