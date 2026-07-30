@@ -169,6 +169,56 @@ export class ObsController extends EventEmitter {
     await this.obs.call('SetInputVolume', { inputName, inputVolumeDb: db })
   }
 
+  /**
+   * Configure OBS for separate-audio-per-microphone recording (requirement 2):
+   * switch to Advanced output, record to a multi-track container, and route each
+   * audio input to its own track plus track 1 (the full mix). Idempotent and
+   * best-effort — each OBS call is guarded so an older/newer OBS still gets as
+   * much applied as it supports. Returns which inputs were routed.
+   */
+  async configureSeparateAudioTracks(): Promise<{ mics: string[]; tracks: number }> {
+    // Audio inputs are those that answer GetInputAudioTracks; others throw.
+    const { inputs } = await this.obs.call('GetInputList')
+    const audioInputs: string[] = []
+    for (const input of inputs) {
+      const name = String(input.inputName)
+      try {
+        await this.obs.call('GetInputAudioTracks', { inputName: name })
+        audioInputs.push(name)
+      } catch {
+        // not an audio input — skip
+      }
+    }
+
+    // Track 1 = full mix; tracks 2.. = one isolated track per input (max 6).
+    const trackCount = Math.min(6, audioInputs.length + 1)
+    const bitmask = (1 << trackCount) - 1
+    const setParam = (parameterCategory: string, parameterName: string, parameterValue: string) =>
+      this.obs
+        .call('SetProfileParameter', { parameterCategory, parameterName, parameterValue })
+        .catch((err) => console.warn(`[obs] SetProfileParameter ${parameterName} failed:`, err))
+
+    await setParam('Output', 'Mode', 'Advanced')
+    // Newer OBS uses RecFormat2; older uses RecFormat. mkv is safe for multitrack.
+    await setParam('AdvOut', 'RecFormat2', 'mkv')
+    await setParam('AdvOut', 'RecFormat', 'mkv')
+    await setParam('AdvOut', 'RecTracks', String(bitmask))
+
+    for (let i = 0; i < audioInputs.length; i++) {
+      const ownTrack = i + 2 // track 1 stays the mix
+      const tracks: Record<string, boolean> = {}
+      for (let t = 1; t <= 6; t++) tracks[String(t)] = t === 1 || t === ownTrack
+      await this.obs
+        .call('SetInputAudioTracks', {
+          inputName: audioInputs[i],
+          inputAudioTracks: tracks,
+        })
+        .catch((err) => console.warn(`[obs] SetInputAudioTracks ${audioInputs[i]} failed:`, err))
+    }
+
+    return { mics: audioInputs, tracks: trackCount }
+  }
+
   async listScenes(): Promise<{ scenes: ObsScene[]; current: string | null }> {
     const data = await this.obs.call('GetSceneList')
     const scenes = data.scenes

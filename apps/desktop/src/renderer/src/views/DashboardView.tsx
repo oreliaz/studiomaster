@@ -87,6 +87,21 @@ export function DashboardView(): JSX.Element {
     await window.studiomaster.podcasts.setActive(id)
   }, [])
 
+  const [audioMsg, setAudioMsg] = useState<string | null>(null)
+  const handleConfigureAudio = useCallback(async () => {
+    setBusy(true)
+    try {
+      const { mics } = await window.studiomaster.obs.configureSeparateAudio()
+      setAudioMsg(
+        mics.length
+          ? t('audio.setupDone').replace('{n}', String(mics.length))
+          : t('audio.setupNone'),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }, [])
+
   return (
     <>
       <header className="view__header">
@@ -172,6 +187,12 @@ export function DashboardView(): JSX.Element {
         ) : (
           <p className="hint">התחבר ל-OBS כדי לשלוט בהקלטה.</p>
         )}
+        <div className="actions">
+          <button className="btn btn--small" onClick={handleConfigureAudio} disabled={!connected || busy}>
+            {t('audio.setup')}
+          </button>
+        </div>
+        <p className="hint">{audioMsg ?? t('audio.setupHint')}</p>
       </section>
     </>
   )

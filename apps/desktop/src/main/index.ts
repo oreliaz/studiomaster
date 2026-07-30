@@ -244,6 +244,7 @@ function registerIpc(): void {
   ipcMain.handle('obs:toggle-record', () => obs.toggleRecord())
   ipcMain.handle('obs:get-record-state', () => obs.getRecordState())
   ipcMain.handle('obs:get-saved-connection', () => store.getSavedConnection())
+  ipcMain.handle('obs:configure-separate-audio', () => obs.configureSeparateAudioTracks())
 
   // Profiles (studios / equipment)
   ipcMain.handle('profiles:list', () => store.listProfiles())

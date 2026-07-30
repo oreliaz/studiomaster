@@ -38,6 +38,8 @@ export interface StudioMasterApi {
     toggleRecord(): Promise<ObsRecordState>
     getRecordState(): Promise<ObsRecordState>
     getSavedConnection(): Promise<ObsConnectionParams | null>
+    /** Configure OBS for separate-audio-per-mic recording. Returns routed mics. */
+    configureSeparateAudio(): Promise<{ mics: string[]; tracks: number }>
   }
   profiles: {
     list(): Promise<StudioProfile[]>

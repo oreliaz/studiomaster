@@ -34,6 +34,7 @@ const api: StudioMasterApi = {
     toggleRecord: () => ipcRenderer.invoke('obs:toggle-record'),
     getRecordState: () => ipcRenderer.invoke('obs:get-record-state'),
     getSavedConnection: () => ipcRenderer.invoke('obs:get-saved-connection'),
+    configureSeparateAudio: () => ipcRenderer.invoke('obs:configure-separate-audio'),
   },
   profiles: {
     list: () => ipcRenderer.invoke('profiles:list'),
