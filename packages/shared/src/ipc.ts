@@ -91,6 +91,8 @@ export interface StudioMasterApi {
   sessions: {
     /** Update per-episode review fields (notes, intro/outro overrides). */
     updateEdit(sessionId: string, patch: SessionEditPatch): Promise<SessionSummary | null>
+    /** Open the recording's folder in the OS file manager. Returns '' on success. */
+    openFolder(sessionId: string): Promise<string>
   }
   cloud: {
     getAuthStatus(): Promise<GoogleAuthStatus>

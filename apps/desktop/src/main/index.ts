@@ -320,6 +320,12 @@ function registerIpc(): void {
     store.saveSession(updated)
     return updated
   })
+  // Open a recording's folder (review.md, cuts.txt, edited outputs, audio tracks).
+  ipcMain.handle('sessions:open-folder', async (_e, sessionId: string) => {
+    const s = store.getSession(sessionId)
+    if (!s?.storagePath) return 'הקלטה לא נמצאה'
+    return shell.openPath(s.storagePath) // '' on success, else the OS error message
+  })
 
   // Cloud (Google Drive + Calendar)
   ipcMain.handle('cloud:get-auth-status', () => cloud.getAuthStatus())

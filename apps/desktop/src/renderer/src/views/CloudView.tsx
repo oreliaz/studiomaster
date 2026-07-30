@@ -91,6 +91,10 @@ export function CloudView(): JSX.Element {
       setBusy(false)
     }
   }
+  const openFolder = async (id: string): Promise<void> => {
+    const err = await window.studiomaster.sessions.openFolder(id)
+    if (err) alert(`לא ניתן לפתוח את התיקייה: ${err}`)
+  }
   const editWithAi = async (id: string): Promise<void> => {
     setAiBusy(id)
     try {
@@ -208,6 +212,9 @@ export function CloudView(): JSX.Element {
                 />
               </div>
               <div className="session__actions">
+                <button className="btn btn--small" onClick={() => openFolder(s.id)}>
+                  📁 {t('session.openFolder')}
+                </button>
                 <button
                   className="btn btn--small"
                   onClick={() => editWithAi(s.id)}

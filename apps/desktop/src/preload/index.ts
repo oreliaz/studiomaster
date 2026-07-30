@@ -86,6 +86,7 @@ const api: StudioMasterApi = {
   sessions: {
     updateEdit: (sessionId: string, patch: SessionEditPatch) =>
       ipcRenderer.invoke('sessions:update-edit', sessionId, patch),
+    openFolder: (sessionId: string) => ipcRenderer.invoke('sessions:open-folder', sessionId),
   },
   cloud: {
     getAuthStatus: () => ipcRenderer.invoke('cloud:get-auth-status'),
