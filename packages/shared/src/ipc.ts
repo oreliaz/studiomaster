@@ -6,10 +6,11 @@ import type {
   CalendarEvent,
   GoogleAuthStatus,
   RunMode,
+  SessionEditPatch,
   SessionSummary,
   UploadProgress,
 } from './cloud.js'
-import type { AiJobResult } from './ai.js'
+import type { AiJobResult, AiProgress } from './ai.js'
 import type { WizardState } from './wizard.js'
 
 /**
@@ -26,6 +27,7 @@ export const IPC_EVENTS = {
   mixerLevels: 'mixer:levels',
   markerAdded: 'markers:added',
   uploadProgress: 'cloud:upload-progress',
+  aiProgress: 'ai:progress',
 } as const
 
 export interface StudioMasterApi {
@@ -82,7 +84,13 @@ export interface StudioMasterApi {
     /** Drop a review marker at the current OBS record timecode. */
     add(category: ReviewMarkerCategory, note?: string): Promise<ReviewMarker | null>
     list(): Promise<ReviewMarker[]>
+    /** All markers for a specific (finished) session — for the post-edit review. */
+    listForSession(sessionId: string): Promise<ReviewMarker[]>
     updateNote(id: string, note: string): Promise<void>
+  }
+  sessions: {
+    /** Update per-episode review fields (notes, intro/outro overrides). */
+    updateEdit(sessionId: string, patch: SessionEditPatch): Promise<SessionSummary | null>
   }
   cloud: {
     getAuthStatus(): Promise<GoogleAuthStatus>
@@ -102,6 +110,7 @@ export interface StudioMasterApi {
     getRunMode(): Promise<RunMode>
     setRunMode(mode: RunMode): Promise<void>
   }
+  onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void
   onRecordState(cb: (state: ObsRecordState) => void): () => void
   onWizardState(cb: (state: WizardState) => void): () => void

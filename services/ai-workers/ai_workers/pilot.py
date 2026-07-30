@@ -35,6 +35,16 @@ BASIC_SKILL = SKILLS_DIR / "basic-editing-he"
 REELS_SKILL = SKILLS_DIR / "podcast-reels-he"
 
 
+def emit(phase: str, frac: float, detail: str = "") -> None:
+    """Stream a progress event the desktop app renders as a live bar.
+
+    The `@@SM@@` sentinel lets the Node side tell progress lines apart from the
+    final JSON summary printed on stdout.
+    """
+    payload = {"phase": phase, "frac": round(max(0.0, min(1.0, frac)), 3), "detail": detail}
+    print("@@SM@@" + json.dumps(payload, ensure_ascii=False), flush=True)
+
+
 def _run(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -> dict:
     """Run a command, capturing status; never raises."""
     try:
@@ -82,7 +92,7 @@ def _write_config(work: Path, job: dict) -> None:
     (work / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), "utf-8")
 
 
-def run_basic(work: Path, capture: Path, dry_run: bool) -> dict:
+def run_basic(work: Path, capture: Path, dry_run: bool, base: float = 0.0, span: float = 1.0) -> dict:
     steps: list[dict] = []
     inner = work / "work"
     inner.mkdir(exist_ok=True)
@@ -93,18 +103,23 @@ def run_basic(work: Path, capture: Path, dry_run: bool) -> dict:
     if dry_run:
         return {"skill": "basic-editing-he", "dry_run": True, "steps": [], "output": None}
 
+    emit("basic-audio", base + span * 0.05, "מחלץ שמע מהוידאו")
     steps.append(
         _run(["ffmpeg", "-y", "-vn", "-i", str(capture), "-ac", "1", "-ar", "16000",
               "-c:a", "pcm_s16le", str(audio)])
     )
+    emit("basic-transcribe", base + span * 0.15, "מתמלל את הפרק (עשוי לקחת מספר דקות)")
     steps.append(
         _run(["python", str(BASIC_SKILL / "scripts" / "transcribe_full.py"),
               str(audio), str(transcript)], env=env)
     )
+    emit("basic-plan", base + span * 0.6, "מתכנן חיתוכים לפי הסימונים")
     steps.append(_run(["python", str(BASIC_SKILL / "scripts" / "plan_edits.py"), str(inner)]))
+    emit("basic-render", base + span * 0.75, "מרנדר את הפרק הערוך")
     steps.append(_run(["python", str(BASIC_SKILL / "scripts" / "render_final.py"), str(inner)]))
 
     final = inner / "final.mp4"
+    emit("basic-done", base + span, "הפרק המלא מוכן")
     return {
         "skill": "basic-editing-he",
         "steps": steps,
@@ -112,10 +127,48 @@ def run_basic(work: Path, capture: Path, dry_run: bool) -> dict:
     }
 
 
-def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_run: bool) -> dict:
+def _hook_for(markers: list[Marker], start_s: float, end_s: float) -> str:
+    """Best hook line for a clip window: a highlight marker's note, else any note."""
+    fallback = ""
+    for m in markers:
+        tc = m.tc_ms / 1000.0
+        note = (m.note or "").strip()
+        if start_s <= tc <= end_s and note:
+            if m.category == "highlight":
+                return note
+            fallback = fallback or note
+    return fallback
+
+
+def _render_clip(clip: Path, captions: Path, out: Path, hook: str, premium: bool) -> dict:
+    """Render one reel with captions + graphics. Premium falls back to simple."""
+    if premium:
+        args = ["python", str(REELS_SKILL / "scripts" / "render_premium.py"),
+                str(clip), str(out), "--captions", str(captions), "--premium"]
+        if hook:
+            args += ["--hook", hook]
+        result = _run(args)
+        if result.get("ok"):
+            result["style"] = "premium"
+            return result
+        # Premium needs puppeteer/Chrome; if it fails, still deliver captioned reels.
+        fallback = _run(["python", str(REELS_SKILL / "scripts" / "render_simple.py"),
+                         str(clip), str(captions), str(out)] + (["--hook", hook] if hook else []))
+        fallback["style"] = "simple(fallback)"
+        fallback["premium_error"] = result.get("error")
+        return fallback
+    result = _run(["python", str(REELS_SKILL / "scripts" / "render_simple.py"),
+                   str(clip), str(captions), str(out)] + (["--hook", hook] if hook else []))
+    result["style"] = "simple"
+    return result
+
+
+def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_run: bool,
+              base: float = 0.0, span: float = 1.0) -> dict:
     d = job.get("deliverables", {})
     count = int(d.get("reelsCount", 15))
     style = d.get("reelStyle", "simple")
+    premium = style == "premium"
     duration = _probe_duration_ms(capture) or (max((m.tc_ms for m in markers), default=0) + 60_000)
     specs = propose_specs(markers, duration, count, int(d.get("reelMinSec", 40)),
                           int(d.get("reelMaxSec", 70)))
@@ -128,20 +181,62 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
 
     steps: list[dict] = []
     clips_dir = work / "clips"
+    words_dir = work / "words"
+    captions_dir = work / "captions"
+    out_dir = work / "out_final"
+    out_dir.mkdir(exist_ok=True)
+    whisper_env = {"CT2_FORCE_CPU_ISA": "GENERIC"}
+
+    # 1) full-episode transcript (reference) + 2) cut the selected clips.
+    emit("reels-transcribe", base + span * 0.05, "מתמלל את הפרק")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "transcribe_full.py"),
-              str(capture), str(work / "transcript.txt")], env={"CT2_FORCE_CPU_ISA": "GENERIC"})
+              str(capture), str(work / "transcript.txt")], env=whisper_env)
     )
+    emit("reels-cut", base + span * 0.3, f"חותך {len(specs)} קליפים")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "cut_clips.py"), str(capture),
               str(clips_dir)] + [spec_to_arg(s) for s in specs])
     )
+
+    clip_files = sorted(clips_dir.glob("*.mp4")) if clips_dir.exists() else []
+
+    # 3) word-level transcription of the SHORT clips (input for captions).
+    emit("reels-words", base + span * 0.45, "מתמלל מילים לכתוביות")
+    if clip_files:
+        steps.append(
+            _run(["python", str(REELS_SKILL / "scripts" / "transcribe_words.py"),
+                  str(words_dir)] + [str(c) for c in clip_files], env=whisper_env)
+        )
+    # 4) group words into caption files (captions/<NN>.json).
+    emit("reels-captions", base + span * 0.55, "בונה כתוביות")
     steps.append(
         _run(["python", str(REELS_SKILL / "scripts" / "build_captions.py"), "build", str(work),
               str(REELS_SKILL / "fixes" / "fixes_he.json")])
     )
-    outputs = sorted(str(p) for p in (work / "out_preview").glob("*.mp4")) if (work / "out_preview").exists() else []
-    return {"skill": "podcast-reels-he", "style": style, "planned_clips": len(specs),
+
+    # 5) render each clip WITH captions + graphics, in the chosen style.
+    style_label = "כריסלייט" if premium else "פשוט"
+    renders: list[dict] = []
+    for i, clip in enumerate(clip_files):
+        nn = clip.name[:2]
+        captions = captions_dir / f"{nn}.json"
+        out = out_dir / f"{nn}.mp4"
+        # Map this clip back to its spec window to pick a hook line from markers.
+        spec = next((s for s in specs if f"{s[0]:02d}" == nn), None)
+        hook = _hook_for(markers, spec[1], spec[2]) if spec else ""
+        frac = base + span * (0.6 + 0.38 * ((i + 1) / max(1, len(clip_files))))
+        emit("reels-render", frac, f"מרנדר רילס {i + 1} מתוך {len(clip_files)} ({style_label})")
+        if captions.exists():
+            renders.append(_render_clip(clip, captions, out, hook, premium))
+        else:
+            renders.append({"cmd": "render", "ok": False, "error": f"no captions for {nn}"})
+    steps.extend(renders)
+
+    outputs = sorted(str(p) for p in out_dir.glob("*.mp4"))
+    emit("reels-done", base + span, f"{len(outputs)} רילסים מוכנים")
+    return {"skill": "podcast-reels-he", "style": style, "premium": premium,
+            "planned_clips": len(specs), "rendered": len(outputs),
             "steps": steps, "outputs": outputs}
 
 
@@ -177,12 +272,18 @@ def process(session_dir: Path, dry_run: bool) -> dict:
     }
     if not capture_ok and not dry_run:
         result["error"] = "capture file not found — set capturePath in job.json"
+        emit("error", 1.0, "קובץ ההקלטה לא נמצא")
         return result
 
+    emit("start", 0.02, "מכין קלט לעריכה")
+    both = edit_type == "both"
     if edit_type in ("basic", "both"):
-        result["basic"] = run_basic(session_dir, capture, dry_run)
+        result["basic"] = run_basic(session_dir, capture, dry_run,
+                                    base=0.02, span=(0.53 if both else 0.93))
     if edit_type in ("reels", "both"):
-        result["reels"] = run_reels(session_dir, capture, job, markers, dry_run)
+        result["reels"] = run_reels(session_dir, capture, job, markers, dry_run,
+                                    base=(0.55 if both else 0.02), span=(0.43 if both else 0.93))
+    emit("done", 1.0, "העריכה הושלמה")
     return result
 
 

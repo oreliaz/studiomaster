@@ -37,6 +37,18 @@ export interface SessionSummary {
   editStatus?: EditStatus
   /** Short human summary of the last edit run. */
   editSummary?: string
+  /** Post-edit free-text notes on the episode. */
+  editNotes?: string
+  /** Per-episode intro/outro overrides (win over the podcast's defaults). */
+  introOverride?: string
+  outroOverride?: string
+}
+
+/** Fields the review UI can change on a session before a re-edit. */
+export interface SessionEditPatch {
+  editNotes?: string
+  introOverride?: string
+  outroOverride?: string
 }
 
 /** When the autonomous editor runs after a recording (docs §6.4, transcript). */

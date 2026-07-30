@@ -17,6 +17,7 @@ import {
   type PtzZoomCommand,
   type ReviewMarkerCategory,
   type RunMode,
+  type SessionEditPatch,
   type StudioProfile,
   type WizardState,
 } from '@studiomaster/shared'
@@ -53,7 +54,7 @@ const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVEN
 const cloud = new CloudService(store, (p: UploadProgress) =>
   broadcast(IPC_EVENTS.uploadProgress, p),
 )
-const ai = new AiEditor(store)
+const ai = new AiEditor(store, (p) => broadcast(IPC_EVENTS.aiProgress, p))
 
 let ptzController: PtzController | null = null
 let ptzProfileId: string | null | undefined = undefined
@@ -304,9 +305,21 @@ function registerIpc(): void {
     addMarker(category, note),
   )
   ipcMain.handle('markers:list', () => store.listMarkers(session.session?.id))
+  ipcMain.handle('markers:list-for-session', (_e, sessionId: string) =>
+    store.listMarkers(sessionId),
+  )
   ipcMain.handle('markers:update-note', (_e, id: string, note: string) =>
     store.updateMarkerNote(id, note),
   )
+
+  // Per-episode review edits (notes + intro/outro overrides)
+  ipcMain.handle('sessions:update-edit', (_e, sessionId: string, patch: SessionEditPatch) => {
+    const existing = store.getSession(sessionId)
+    if (!existing) return null
+    const updated = { ...existing, ...patch }
+    store.saveSession(updated)
+    return updated
+  })
 
   // Cloud (Google Drive + Calendar)
   ipcMain.handle('cloud:get-auth-status', () => cloud.getAuthStatus())

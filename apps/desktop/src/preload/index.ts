@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC_EVENTS,
+  type AiProgress,
   type InputLevel,
   type ObsConnectionParams,
   type ObsConnectionState,
@@ -12,6 +13,7 @@ import {
   type ReviewMarker,
   type ReviewMarkerCategory,
   type RunMode,
+  type SessionEditPatch,
   type StudioMasterApi,
   type StudioProfile,
   type UploadProgress,
@@ -77,7 +79,13 @@ const api: StudioMasterApi = {
     add: (category: ReviewMarkerCategory, note?: string) =>
       ipcRenderer.invoke('markers:add', category, note),
     list: () => ipcRenderer.invoke('markers:list'),
+    listForSession: (sessionId: string) =>
+      ipcRenderer.invoke('markers:list-for-session', sessionId),
     updateNote: (id: string, note: string) => ipcRenderer.invoke('markers:update-note', id, note),
+  },
+  sessions: {
+    updateEdit: (sessionId: string, patch: SessionEditPatch) =>
+      ipcRenderer.invoke('sessions:update-edit', sessionId, patch),
   },
   cloud: {
     getAuthStatus: () => ipcRenderer.invoke('cloud:get-auth-status'),
@@ -103,6 +111,7 @@ const api: StudioMasterApi = {
   onMarkerAdded: (cb: (marker: ReviewMarker) => void) => subscribe(IPC_EVENTS.markerAdded, cb),
   onUploadProgress: (cb: (progress: UploadProgress) => void) =>
     subscribe(IPC_EVENTS.uploadProgress, cb),
+  onAiProgress: (cb: (progress: AiProgress) => void) => subscribe(IPC_EVENTS.aiProgress, cb),
 }
 
 contextBridge.exposeInMainWorld('studiomaster', api)

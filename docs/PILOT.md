@@ -86,7 +86,8 @@ python scripts\setup_check.py     # מדווח מה מוכן
 בתוך תיקיית ה-session (תחת `%APPDATA%/@studiomaster/desktop/recordings/<תאריך>/`):
 - `review.md` / `cuts.txt` — מסמך התיקונים והחיתוכים.
 - `work/final.mp4` — הפרק הערוך (עריכה בסיסית).
-- `out_preview/*.mp4` — הרילסים.
+- `out_final/*.mp4` — הרילסים המוגמרים (עם כתוביות וגרפיקה; סגנון פרימיום = כריסלייט).
+- `audio/track*.wav` — ערוצי האודיו הנפרדים לכל מיקרופון.
 אם חיברת Google בלשונית "ענן ועריכה" — אפשר להעלות הכל ל-Drive בלחיצה.
 
 ### 8. עברית ואנגלית
@@ -124,7 +125,12 @@ Windows חוסם קבצים לא-חתומים (אין לנו עדיין תעוד
 - **לטווח ארוך:** חתימת קוד (EV/OV certificate) מסירה את החסימות בהפצה. לא נדרש לפיילוט.
 
 ## מגבלות ידועות בפיילוט · Known pilot limits
-- הצעת 15 הקליפים לרילס: כרגע נגזרת מסמני ההדגשה + פיזור אחיד (הבחירה החכמה עם מודל —
-  שלב הבא). *(Reel clip selection is marker-driven for now; model-picked clips are next.)*
-- סגנון **פרימיום** דורש את מנוע ה-Node של הסקיל מותקן. *(Premium reels need the skill's Node engine.)*
+- **גבולות הקליפים** לרילס נגזרים כרגע מסמני ההדגשה + פיזור אחיד (עדיין לא בחירה חכמה
+  מבוססת-תמלול עם מודל — לכן קליפ עלול להתחיל/להסתיים באמצע משפט). *סמן הדגשה (Ctrl+Shift+2)
+  על רגעים חזקים משפר משמעותית את החיתוך.* *(Reel boundaries are marker-driven + uniform
+  spread; transcript-aware model selection is the next step. Use highlight markers.)*
+- סגנון **פרימיום (כריסלייט)** דורש שמנוע ה-Node של הסקיל יותקן (אשף ההתקנה של הרילס עושה
+  זאת: puppeteer + Chrome). אם הרינדור הפרימיום נכשל, המערכת נופלת אוטומטית לסגנון **פשוט**
+  עם כתוביות, כדי שתמיד יתקבלו רילסים. *(Premium falls back to captioned simple if the Node
+  engine/Chrome is missing.)*
 - פורמט פקודת FreeStyler לאימות בשטח. *(FreeStyler command format to verify on-site.)*

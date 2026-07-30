@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react'
-import type {
-  CalendarEvent,
-  EditStatus,
-  GoogleAuthStatus,
-  RunMode,
-  SessionSummary,
-  UploadProgress,
+import {
+  msToTimecode,
+  type AiProgress,
+  type CalendarEvent,
+  type EditStatus,
+  type GoogleAuthStatus,
+  type ReviewMarker,
+  type RunMode,
+  type SessionSummary,
+  type UploadProgress,
 } from '@studiomaster/shared'
 import { t } from '../i18n.js'
+
+const CAT_LABEL: Record<ReviewMarker['category'], string> = {
+  fix: 'תיקון',
+  highlight: 'הדגשה',
+  chapter: 'פרק',
+  note: 'הערה',
+}
 
 export function CloudView(): JSX.Element {
   const [status, setStatus] = useState<GoogleAuthStatus>({ connected: false, configured: false })
@@ -19,6 +29,8 @@ export function CloudView(): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState<string | null>(null)
   const [runMode, setRunMode] = useState<RunMode>('ask')
+  const [aiProgress, setAiProgress] = useState<Record<string, AiProgress>>({})
+  const [openReview, setOpenReview] = useState<string | null>(null)
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
@@ -30,10 +42,18 @@ export function CloudView(): JSX.Element {
 
   useEffect(() => {
     void refresh()
-    return window.studiomaster.onUploadProgress((p) => {
+    const offUpload = window.studiomaster.onUploadProgress((p) => {
       setProgress(p)
       if (p.state === 'done') void refresh()
     })
+    const offAi = window.studiomaster.onAiProgress((p) => {
+      setAiProgress((prev) => ({ ...prev, [p.sessionId]: p }))
+      if (p.phase === 'done' || p.phase === 'error') void refresh()
+    })
+    return () => {
+      offUpload()
+      offAi()
+    }
   }, [])
 
   const changeRunMode = async (mode: RunMode): Promise<void> => {
@@ -179,6 +199,15 @@ export function CloudView(): JSX.Element {
                   <span className="session__meta">אורחים: {s.guests.join(', ')}</span>
                 )}
                 <EditStatusLine status={s.editStatus} summary={s.editSummary} />
+                <AiProgressBar progress={aiProgress[s.id]} active={s.editStatus === 'running'} />
+                {(s.editStatus === 'done' || s.editStatus === 'error') && (
+                  <SessionReview
+                    session={s}
+                    open={openReview === s.id}
+                    onToggle={() => setOpenReview((cur) => (cur === s.id ? null : s.id))}
+                    onReedit={() => editWithAi(s.id)}
+                  />
+                )}
               </div>
               <div className="session__actions">
                 <button
@@ -244,6 +273,129 @@ function EditStatusLine({
       {label}
       {summary ? ` · ${summary}` : ''}
     </span>
+  )
+}
+
+/** A live progress bar for the editing pipeline (requirement: what & how much). */
+function AiProgressBar({
+  progress,
+  active,
+}: {
+  progress?: AiProgress
+  active: boolean
+}): JSX.Element | null {
+  if (!progress && !active) return null
+  const pct = Math.round(Math.min(1, Math.max(0, progress?.frac ?? 0)) * 100)
+  const detail = progress?.detail ?? t('edit.running')
+  const done = progress?.phase === 'done'
+  const error = progress?.phase === 'error'
+  if (done && !active) return null
+  return (
+    <div className="progress">
+      <div className="progress__bar">
+        <div
+          className={`progress__fill ${error ? 'progress__fill--error' : ''}`}
+          style={{ width: `${error ? 100 : pct}%` }}
+        />
+      </div>
+      <span className="progress__label">
+        {error ? `⚠ ${detail}` : `${detail} · ${pct}%`}
+      </span>
+    </div>
+  )
+}
+
+/** Post-edit review: see the marker points, add notes, override intro/outro, re-edit. */
+function SessionReview({
+  session,
+  open,
+  onToggle,
+  onReedit,
+}: {
+  session: SessionSummary
+  open: boolean
+  onToggle: () => void
+  onReedit: () => void
+}): JSX.Element {
+  const [markers, setMarkers] = useState<ReviewMarker[]>([])
+  const [intro, setIntro] = useState(session.introOverride ?? '')
+  const [outro, setOutro] = useState(session.outroOverride ?? '')
+  const [notes, setNotes] = useState(session.editNotes ?? '')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (open) void window.studiomaster.markers.listForSession(session.id).then(setMarkers)
+  }, [open, session.id])
+
+  const saveNote = async (id: string, note: string): Promise<void> => {
+    setMarkers((prev) => prev.map((m) => (m.id === id ? { ...m, note } : m)))
+    await window.studiomaster.markers.updateNote(id, note)
+  }
+  const saveEdits = async (): Promise<void> => {
+    await window.studiomaster.sessions.updateEdit(session.id, {
+      introOverride: intro,
+      outroOverride: outro,
+      editNotes: notes,
+    })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 1500)
+  }
+  const reedit = async (): Promise<void> => {
+    await saveEdits()
+    onReedit()
+  }
+
+  return (
+    <div className="review">
+      <button className="btn btn--small btn--ghost" onClick={onToggle}>
+        {open ? '▾' : '▸'} {t('review.toggle')}
+      </button>
+      {open && (
+        <div className="review__body">
+          <label className="review__section">{t('review.cuts')}</label>
+          {markers.length === 0 && <p className="hint">{t('review.noCuts')}</p>}
+          <ul className="review__markers">
+            {markers.map((m) => (
+              <li key={m.id} className="review__marker">
+                <span className="review__tc">{msToTimecode(m.tcMs)}</span>
+                <span className={`marker-list__cat cat--${m.category}`}>
+                  {CAT_LABEL[m.category]}
+                </span>
+                <input
+                  className="review__note"
+                  defaultValue={m.note ?? ''}
+                  placeholder={t('review.notePlaceholder')}
+                  onBlur={(e) => saveNote(m.id, e.target.value)}
+                />
+              </li>
+            ))}
+          </ul>
+
+          <div className="grid2">
+            <div className="field">
+              <label>{t('review.intro')}</label>
+              <input value={intro} onChange={(e) => setIntro(e.target.value)} placeholder="C:/assets/intro.mp4" />
+            </div>
+            <div className="field">
+              <label>{t('review.outro')}</label>
+              <input value={outro} onChange={(e) => setOutro(e.target.value)} placeholder="C:/assets/outro.mp4" />
+            </div>
+          </div>
+          <div className="field">
+            <label>{t('review.notes')}</label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+          </div>
+          <div className="actions">
+            <button className="btn btn--small" onClick={saveEdits}>
+              {saved ? t('review.saved') : t('review.save')}
+            </button>
+            <button className="btn btn--small btn--primary" onClick={reedit}>
+              {t('review.reedit')}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
