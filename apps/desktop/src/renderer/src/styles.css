@@ -491,6 +491,71 @@ body {
   flex: 1;
 }
 
+/* ── knowledge base ── */
+.kb-note {
+  margin-bottom: 12px;
+}
+.kb-note__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.kb-issue-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.kb-issue-form button {
+  grid-column: 1 / -1;
+}
+.issue-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.issue {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #1b2230;
+  border-radius: 8px;
+}
+.issue__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.issue__symptom {
+  color: var(--muted);
+  font-size: 13px;
+}
+.issue__fix {
+  color: #86efac;
+  font-size: 13px;
+}
+.issue__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.tag {
+  display: inline-block;
+  background: #1b2230;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-inline-end: 4px;
+}
+.issue__actions {
+  display: flex;
+  gap: 4px;
+  align-items: flex-start;
+}
+
 /* ── steps / checklist ── */
 .steps,
 .checklist {

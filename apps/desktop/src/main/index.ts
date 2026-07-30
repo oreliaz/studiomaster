@@ -10,6 +10,8 @@ import {
   type ObsConnectionParams,
   type ObsConnectionState,
   defaultDeliverables,
+  type KnowledgeBase,
+  type KnownIssue,
   type ObsRecordState,
   type Podcast,
   type PtzMoveCommand,
@@ -231,6 +233,75 @@ function addMarker(category: ReviewMarkerCategory, note?: string) {
   return marker
 }
 
+// ── Shared knowledge base (docs §6.5) ──
+function kbAuthor(): string | undefined {
+  return cloud.getAuthStatus().email
+}
+
+/** Upsert the accumulated editing note for a podcast (keyed by name). */
+function savePodcastNote(podcastName: string, notes: string): KnowledgeBase {
+  const kb = store.getKb()
+  const key = podcastName.trim().toLowerCase()
+  const now = new Date().toISOString()
+  const existing = kb.podcastNotes.find((n) => n.podcastName.trim().toLowerCase() === key)
+  if (existing) {
+    existing.notes = notes
+    existing.updatedAt = now
+    existing.author = kbAuthor()
+  } else {
+    kb.podcastNotes.push({
+      id: randomUUID(),
+      podcastName,
+      notes,
+      updatedAt: now,
+      author: kbAuthor(),
+    })
+  }
+  kb.updatedAt = now
+  store.setKb(kb)
+  return kb
+}
+
+type IssueInput = { id?: string; title: string; symptom: string; fix: string; tags?: string[] }
+
+/** Upsert a known editing issue (bug + fix) so it never bites anyone twice. */
+function saveIssue(input: IssueInput): KnowledgeBase {
+  const kb = store.getKb()
+  const now = new Date().toISOString()
+  const existing = input.id ? kb.knownIssues.find((i) => i.id === input.id) : undefined
+  if (existing) {
+    existing.title = input.title
+    existing.symptom = input.symptom
+    existing.fix = input.fix
+    existing.tags = input.tags ?? []
+    existing.updatedAt = now
+    existing.author = kbAuthor()
+  } else {
+    const issue: KnownIssue = {
+      id: randomUUID(),
+      title: input.title,
+      symptom: input.symptom,
+      fix: input.fix,
+      tags: input.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
+      author: kbAuthor(),
+    }
+    kb.knownIssues.push(issue)
+  }
+  kb.updatedAt = now
+  store.setKb(kb)
+  return kb
+}
+
+function deleteIssue(id: string): KnowledgeBase {
+  const kb = store.getKb()
+  kb.knownIssues = kb.knownIssues.filter((i) => i.id !== id)
+  kb.updatedAt = new Date().toISOString()
+  store.setKb(kb)
+  return kb
+}
+
 function registerIpc(): void {
   // OBS
   ipcMain.handle('obs:connect', async (_e, params: ObsConnectionParams) => {
@@ -338,6 +409,19 @@ function registerIpc(): void {
   ipcMain.handle('cloud:list-sessions', () => cloud.listSessions())
   ipcMain.handle('cloud:recognize-session', (_e, id: string) => cloud.recognizeSession(id))
   ipcMain.handle('cloud:upload-session', (_e, id: string) => cloud.uploadSession(id))
+
+  // Shared knowledge base
+  ipcMain.handle('kb:get', () => store.getKb())
+  ipcMain.handle('kb:save-podcast-note', (_e, name: string, notes: string) =>
+    savePodcastNote(name, notes),
+  )
+  ipcMain.handle('kb:save-issue', (_e, input: IssueInput) => saveIssue(input))
+  ipcMain.handle('kb:delete-issue', (_e, id: string) => deleteIssue(id))
+  ipcMain.handle('kb:sync', async () => {
+    const merged = await cloud.syncKnowledgeBase(store.getKb())
+    store.setKb(merged)
+    return merged
+  })
 
   // AI editing agents
   ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))

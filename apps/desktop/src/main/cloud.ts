@@ -1,10 +1,13 @@
 import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type {
-  CalendarEvent,
-  GoogleAuthStatus,
-  SessionSummary,
-  UploadProgress,
+import {
+  emptyKnowledgeBase,
+  mergeKnowledgeBase,
+  type CalendarEvent,
+  type GoogleAuthStatus,
+  type KnowledgeBase,
+  type SessionSummary,
+  type UploadProgress,
 } from '@studiomaster/shared'
 import type { Store } from './store.js'
 import { GoogleAuthManager } from './google/auth.js'
@@ -47,6 +50,33 @@ export class CloudService {
 
   listSessions(): SessionSummary[] {
     return this.store.listSessions()
+  }
+
+  /**
+   * Sync the shared knowledge base with the Drive copy: pull the shared file,
+   * merge it with `local` (last-write-wins per item), push the merged result
+   * back, and return it. The file lives at StudioMaster/knowledge-base.json;
+   * to share across users, share that Drive folder with them.
+   */
+  async syncKnowledgeBase(local: KnowledgeBase): Promise<KnowledgeBase> {
+    const client = this.auth.getClient()
+    if (!client) throw new Error('לא מחובר לגוגל')
+    const drive = new DriveClient(client)
+    const root = await drive.ensureFolder('StudioMaster')
+
+    let remote = emptyKnowledgeBase()
+    const fileId = await drive.findFile('knowledge-base.json', root)
+    if (fileId) {
+      try {
+        remote = JSON.parse(await drive.downloadText(fileId)) as KnowledgeBase
+      } catch {
+        // corrupt/empty remote — treat as empty and let the merge heal it
+      }
+    }
+    const merged = mergeKnowledgeBase(local, remote)
+    merged.updatedAt = new Date().toISOString()
+    await drive.writeJson('knowledge-base.json', root, JSON.stringify(merged, null, 2))
+    return merged
   }
 
   /** Attach the overlapping calendar event's title/guests to the session. */

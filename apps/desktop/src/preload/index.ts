@@ -104,6 +104,15 @@ const api: StudioMasterApi = {
     getRunMode: () => ipcRenderer.invoke('ai:get-run-mode'),
     setRunMode: (mode: RunMode) => ipcRenderer.invoke('ai:set-run-mode', mode),
   },
+  kb: {
+    get: () => ipcRenderer.invoke('kb:get'),
+    savePodcastNote: (name: string, notes: string) =>
+      ipcRenderer.invoke('kb:save-podcast-note', name, notes),
+    saveIssue: (input: { id?: string; title: string; symptom: string; fix: string; tags?: string[] }) =>
+      ipcRenderer.invoke('kb:save-issue', input),
+    deleteIssue: (id: string) => ipcRenderer.invoke('kb:delete-issue', id),
+    sync: () => ipcRenderer.invoke('kb:sync'),
+  },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),
   onRecordState: (cb: (state: ObsRecordState) => void) => subscribe(IPC_EVENTS.obsRecord, cb),

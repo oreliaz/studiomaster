@@ -38,10 +38,21 @@ export class AiEditor {
     // Per-episode intro/outro overrides (set in the post-edit review) win.
     if (session.introOverride !== undefined) deliverables.intro = session.introOverride || undefined
     if (session.outroOverride !== undefined) deliverables.outro = session.outroOverride || undefined
+
+    // Free-text correction notes for this episode + the podcast's accumulated KB
+    // guidelines, so the editor (reel selection) acts on human feedback and the
+    // next edit of this show starts from the same conventions.
+    const kb = this.store.getKb()
+    const key = podcast?.name.trim().toLowerCase()
+    const guideline = key
+      ? kb.podcastNotes.find((n) => n.podcastName.trim().toLowerCase() === key)
+      : undefined
     const job = {
       sessionId,
       capturePath: session.capturePath ?? '',
       deliverables,
+      notes: session.editNotes ?? '',
+      podcastGuidelines: guideline?.notes ?? '',
     }
 
     try {

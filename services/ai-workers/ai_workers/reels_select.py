@@ -109,8 +109,13 @@ def select_clips(
     min_s: int = 40,
     max_s: int = 70,
     language: str = "he",
+    guidance: str = "",
 ) -> list[ClipPick] | None:
-    """Ask Claude to pick the best clips. Returns None if unavailable/failed."""
+    """Ask Claude to pick the best clips. Returns None if unavailable/failed.
+
+    `guidance` carries free-text editor corrections + the podcast's accumulated
+    knowledge-base notes, so human feedback steers the selection.
+    """
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key or not segments:
         return None
@@ -131,6 +136,11 @@ def select_clips(
         'Return ONLY a JSON object: {"clips":[{"start":<sec>,"end":<sec>,'
         '"hook":"<short hook line>","title":"<3-5 word english slug>"}]}'
     )
+    if guidance.strip():
+        system += (
+            "\n\nEDITOR GUIDANCE (human corrections + this show's conventions — "
+            f"follow these closely): {guidance.strip()}"
+        )
     try:
         import anthropic  # type: ignore
 

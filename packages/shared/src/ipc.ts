@@ -1,4 +1,5 @@
 import type { Podcast, ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.js'
+import type { KnowledgeBase } from './kb.js'
 import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
@@ -111,6 +112,21 @@ export interface StudioMasterApi {
     processSession(sessionId: string): Promise<AiJobResult>
     getRunMode(): Promise<RunMode>
     setRunMode(mode: RunMode): Promise<void>
+  }
+  kb: {
+    get(): Promise<KnowledgeBase>
+    /** Upsert the accumulated editing note for a podcast (by name). */
+    savePodcastNote(podcastName: string, notes: string): Promise<KnowledgeBase>
+    saveIssue(input: {
+      id?: string
+      title: string
+      symptom: string
+      fix: string
+      tags?: string[]
+    }): Promise<KnowledgeBase>
+    deleteIssue(id: string): Promise<KnowledgeBase>
+    /** Merge with the shared Drive copy and push back. Requires Google connected. */
+    sync(): Promise<KnowledgeBase>
   }
   onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void

@@ -41,6 +41,43 @@ export class DriveClient {
     return created.data.id
   }
 
+  /** Find a non-folder file by name under a parent. Returns its id, or null. */
+  async findFile(name: string, parentId: string): Promise<string | null> {
+    const safeName = name.replace(/'/g, "\\'")
+    const res = await this.drive.files.list({
+      q: `name='${safeName}' and '${parentId}' in parents and trashed=false`,
+      fields: 'files(id,name)',
+      spaces: 'drive',
+    })
+    return res.data.files?.[0]?.id ?? null
+  }
+
+  /** Download a file's text content (empty string if it has none). */
+  async downloadText(fileId: string): Promise<string> {
+    const res = await this.drive.files.get(
+      { fileId, alt: 'media' },
+      { responseType: 'text' },
+    )
+    return typeof res.data === 'string' ? res.data : JSON.stringify(res.data)
+  }
+
+  /** Create or overwrite a small JSON file by name under a folder. Returns its id. */
+  async writeJson(name: string, parentId: string, content: string): Promise<string> {
+    const existing = await this.findFile(name, parentId)
+    const media = { mimeType: 'application/json', body: content }
+    if (existing) {
+      await this.drive.files.update({ fileId: existing, media })
+      return existing
+    }
+    const created = await this.drive.files.create({
+      requestBody: { name, parents: [parentId], mimeType: 'application/json' },
+      media,
+      fields: 'id',
+    })
+    if (!created.data.id) throw new Error(`failed to write ${name}`)
+    return created.data.id
+  }
+
   /** Upload one file into a folder; reports byte progress. Returns the file id. */
   async uploadFile(
     path: string,

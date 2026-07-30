@@ -89,6 +89,8 @@ def _write_config(work: Path, job: dict) -> None:
         "target_lufs": d.get("targetLufs", -16.0),
         "language": d.get("language", "he"),
         "auto_detect": True,
+        "notes": job.get("notes", ""),
+        "podcast_guidelines": job.get("podcastGuidelines", ""),
     }
     (work / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), "utf-8")
 
@@ -143,7 +145,7 @@ def _hook_for(markers: list[Marker], start_s: float, end_s: float) -> str:
 
 def _plan_clips(
     work: Path, markers: list[Marker], duration_ms: int, count: int, min_s: int, max_s: int,
-    deliverables: dict,
+    deliverables: dict, guidance: str = "",
 ) -> tuple[list[tuple[int, float, float, str]], dict[int, str], str]:
     """Choose clip windows: model-based from the transcript, else marker-driven.
 
@@ -157,7 +159,7 @@ def _plan_clips(
             segments, dur_s = load_transcript(str(transcript_json))
             picks: list[ClipPick] | None = select_clips(
                 segments, dur_s or duration_ms / 1000, count, min_s, max_s,
-                deliverables.get("language", "he"),
+                deliverables.get("language", "he"), guidance,
             )
         except Exception as exc:  # noqa: BLE001
             print(f"[reels] transcript-based selection failed: {exc}", flush=True)
@@ -230,8 +232,10 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     )
 
     # 2) choose clip windows: model-based from the transcript, else marker-driven.
+    #    Human correction notes + the podcast's KB guidelines steer the model.
+    guidance = " ".join(x for x in (job.get("notes", ""), job.get("podcastGuidelines", "")) if x)
     emit("reels-select", base + span * 0.32, "בוחר קליפים חכמים לפי התמלול")
-    specs, hooks, selection = _plan_clips(work, markers, duration, count, min_s, max_s, d)
+    specs, hooks, selection = _plan_clips(work, markers, duration, count, min_s, max_s, d, guidance)
     (work / "reel_specs.txt").write_text(
         "\n".join(spec_to_arg(s) for s in specs) + ("\n" if specs else ""), "utf-8"
     )

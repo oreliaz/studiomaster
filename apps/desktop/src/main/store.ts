@@ -2,8 +2,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { app } from 'electron'
 import {
+  emptyKnowledgeBase,
   podcastSchema,
   studioProfileSchema,
+  type KnowledgeBase,
   type ObsConnectionParams,
   type Podcast,
   type ReviewMarker,
@@ -38,6 +40,8 @@ export interface Store {
   saveSession(session: SessionSummary): void
   getSession(id: string): SessionSummary | null
   listSessions(): SessionSummary[]
+  getKb(): KnowledgeBase
+  setKb(kb: KnowledgeBase): void
 }
 
 interface DbShape {
@@ -46,9 +50,17 @@ interface DbShape {
   podcasts: Record<string, Podcast>
   markers: ReviewMarker[]
   sessions: Record<string, SessionSummary>
+  kb: KnowledgeBase
 }
 
-const EMPTY: DbShape = { settings: {}, profiles: {}, podcasts: {}, markers: [], sessions: {} }
+const EMPTY: DbShape = {
+  settings: {},
+  profiles: {},
+  podcasts: {},
+  markers: [],
+  sessions: {},
+  kb: emptyKnowledgeBase(),
+}
 const OBS_CONNECTION_KEY = 'obs.connection'
 
 function parseProfile(profile: StudioProfile): StudioProfile | null {
@@ -190,6 +202,13 @@ class JsonFileStore implements Store {
       b.startedAt.localeCompare(a.startedAt),
     )
   }
+  getKb(): KnowledgeBase {
+    return this.data.kb ?? emptyKnowledgeBase()
+  }
+  setKb(kb: KnowledgeBase): void {
+    this.data.kb = kb
+    this.save()
+  }
 }
 
 /** Volatile fallback if even the JSON file can't be used. */
@@ -199,6 +218,7 @@ class MemoryStore implements Store {
   private readonly podcasts = new Map<string, Podcast>()
   private readonly markers: ReviewMarker[] = []
   private readonly sessions = new Map<string, SessionSummary>()
+  private kb: KnowledgeBase = emptyKnowledgeBase()
 
   getSetting(key: string): string | null {
     return this.settings.get(key) ?? null
@@ -260,6 +280,12 @@ class MemoryStore implements Store {
   }
   listSessions(): SessionSummary[] {
     return [...this.sessions.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+  }
+  getKb(): KnowledgeBase {
+    return this.kb
+  }
+  setKb(kb: KnowledgeBase): void {
+    this.kb = kb
   }
 }
 
