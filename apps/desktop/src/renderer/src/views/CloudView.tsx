@@ -200,14 +200,12 @@ export function CloudView(): JSX.Element {
                 )}
                 <EditStatusLine status={s.editStatus} summary={s.editSummary} />
                 <AiProgressBar progress={aiProgress[s.id]} active={s.editStatus === 'running'} />
-                {(s.editStatus === 'done' || s.editStatus === 'error') && (
-                  <SessionReview
-                    session={s}
-                    open={openReview === s.id}
-                    onToggle={() => setOpenReview((cur) => (cur === s.id ? null : s.id))}
-                    onReedit={() => editWithAi(s.id)}
-                  />
-                )}
+                <SessionReview
+                  session={s}
+                  open={openReview === s.id}
+                  onToggle={() => setOpenReview((cur) => (cur === s.id ? null : s.id))}
+                  onReedit={() => editWithAi(s.id)}
+                />
               </div>
               <div className="session__actions">
                 <button
