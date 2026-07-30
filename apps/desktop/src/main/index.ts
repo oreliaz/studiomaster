@@ -31,6 +31,7 @@ import { CloudService } from './cloud.js'
 import { AiEditor } from './ai.js'
 import { startDockServer } from './dock.js'
 import { splitAudioTracks } from './audioSplit.js'
+import { BackendService } from './backend/index.js'
 
 /** Convention: add a source with this name to the scene for on-screen marker confirmation. */
 const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
@@ -57,6 +58,7 @@ const cloud = new CloudService(store, (p: UploadProgress) =>
   broadcast(IPC_EVENTS.uploadProgress, p),
 )
 const ai = new AiEditor(store, (p) => broadcast(IPC_EVENTS.aiProgress, p))
+const backend = new BackendService(store)
 
 let ptzController: PtzController | null = null
 let ptzProfileId: string | null | undefined = undefined
@@ -418,10 +420,37 @@ function registerIpc(): void {
   ipcMain.handle('kb:save-issue', (_e, input: IssueInput) => saveIssue(input))
   ipcMain.handle('kb:delete-issue', (_e, id: string) => deleteIssue(id))
   ipcMain.handle('kb:sync', async () => {
-    const merged = await cloud.syncKnowledgeBase(store.getKb())
+    // Prefer the Supabase workspace when signed in; otherwise fall back to Drive.
+    const merged = backend.canSync()
+      ? await backend.syncKnowledgeBase(store.getKb())
+      : await cloud.syncKnowledgeBase(store.getKb())
     store.setKb(merged)
     return merged
   })
+
+  // Backend accounts + shared workspaces (Supabase)
+  ipcMain.handle('backend:get-status', () => backend.getStatus())
+  ipcMain.handle('backend:set-config', (_e, url: string, anonKey: string) =>
+    backend.setConfig(url, anonKey),
+  )
+  ipcMain.handle('backend:sign-up', (_e, email: string, password: string) =>
+    backend.signUp(email, password),
+  )
+  ipcMain.handle('backend:sign-in', (_e, email: string, password: string) =>
+    backend.signIn(email, password),
+  )
+  ipcMain.handle('backend:sign-out', () => backend.signOut())
+  ipcMain.handle('backend:list-workspaces', () => backend.listWorkspaces())
+  ipcMain.handle('backend:create-workspace', (_e, name: string, studio?: string) =>
+    backend.createWorkspace(name, studio),
+  )
+  ipcMain.handle('backend:join-workspace', (_e, code: string, studio?: string) =>
+    backend.joinWorkspace(code, studio),
+  )
+  ipcMain.handle('backend:set-active-workspace', (_e, id: string) =>
+    backend.setActiveWorkspace(id),
+  )
+  ipcMain.handle('backend:list-members', () => backend.listMembers())
 
   // AI editing agents
   ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))

@@ -1,5 +1,6 @@
 import type { Podcast, ReviewMarker, ReviewMarkerCategory, StudioProfile } from './model.js'
 import type { KnowledgeBase } from './kb.js'
+import type { AuthStatus, Workspace, WorkspaceMember } from './backend.js'
 import type { ObsInput, ObsScene, InputLevel } from './mixer.js'
 import type { ObsConnectionParams, ObsConnectionState, ObsRecordState } from './obs.js'
 import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
@@ -125,8 +126,20 @@ export interface StudioMasterApi {
       tags?: string[]
     }): Promise<KnowledgeBase>
     deleteIssue(id: string): Promise<KnowledgeBase>
-    /** Merge with the shared Drive copy and push back. Requires Google connected. */
+    /** Merge with the shared copy (Supabase workspace, else Drive) and push back. */
     sync(): Promise<KnowledgeBase>
+  }
+  backend: {
+    getStatus(): Promise<AuthStatus>
+    setConfig(url: string, anonKey: string): Promise<AuthStatus>
+    signUp(email: string, password: string): Promise<AuthStatus>
+    signIn(email: string, password: string): Promise<AuthStatus>
+    signOut(): Promise<AuthStatus>
+    listWorkspaces(): Promise<Workspace[]>
+    createWorkspace(name: string, studioName?: string): Promise<Workspace>
+    joinWorkspace(joinCode: string, studioName?: string): Promise<Workspace>
+    setActiveWorkspace(id: string): Promise<void>
+    listMembers(): Promise<WorkspaceMember[]>
   }
   onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void

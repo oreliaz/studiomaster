@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { KnowledgeBase, KnownIssue, Podcast } from '@studiomaster/shared'
+import type {
+  AuthStatus,
+  KnowledgeBase,
+  KnownIssue,
+  Podcast,
+  Workspace,
+  WorkspaceMember,
+} from '@studiomaster/shared'
 import { t } from '../i18n.js'
 
 /**
@@ -53,6 +60,8 @@ export function KnowledgeView(): JSX.Element {
       </header>
       <p className="hint">{t('kb.subtitle')}</p>
 
+      <BackendPanel />
+
       <section className="card">
         <h2>{t('kb.podcastNotes')}</h2>
         <p className="hint">{t('kb.podcastNotesHint')}</p>
@@ -74,6 +83,176 @@ export function KnowledgeView(): JSX.Element {
         </ul>
       </section>
     </>
+  )
+}
+
+/** Account (studio user) + shared workspace management, backed by Supabase. */
+function BackendPanel(): JSX.Element {
+  const [status, setStatus] = useState<AuthStatus | null>(null)
+  const [url, setUrl] = useState('')
+  const [anonKey, setAnonKey] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [studio, setStudio] = useState('')
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [wsName, setWsName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const b = window.studiomaster.backend
+  const refresh = async (): Promise<void> => {
+    const s = await b.getStatus()
+    setStatus(s)
+    if (s.signedIn) {
+      setWorkspaces(await b.listWorkspaces().catch(() => []))
+      if (s.workspaceId) setMembers(await b.listMembers().catch(() => []))
+    }
+  }
+  useEffect(() => {
+    void refresh()
+  }, [])
+
+  const run = async (fn: () => Promise<unknown>): Promise<void> => {
+    setBusy(true)
+    try {
+      await fn()
+      await refresh()
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!status) return <section className="card" />
+
+  const activeWs = workspaces.find((w) => w.id === status.workspaceId)
+
+  return (
+    <section className="card">
+      <h2>{t('backend.title')}</h2>
+
+      {!status.configured ? (
+        <>
+          <p className="hint">{t('backend.configHint')}</p>
+          <div className="field">
+            <label>{t('backend.url')}</label>
+            <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://xxxx.supabase.co" />
+          </div>
+          <div className="field">
+            <label>{t('backend.anonKey')}</label>
+            <input value={anonKey} onChange={(e) => setAnonKey(e.target.value)} />
+          </div>
+          <button
+            className="btn btn--primary"
+            disabled={!url || !anonKey || busy}
+            onClick={() => run(() => b.setConfig(url, anonKey))}
+          >
+            {t('backend.saveConfig')}
+          </button>
+        </>
+      ) : !status.signedIn ? (
+        <>
+          <div className="grid2">
+            <div className="field">
+              <label>{t('backend.email')}</label>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>{t('backend.password')}</label>
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+          </div>
+          <div className="actions">
+            <button className="btn" disabled={busy} onClick={() => run(() => b.signIn(email, password))}>
+              {t('backend.signIn')}
+            </button>
+            <button
+              className="btn btn--primary"
+              disabled={busy}
+              onClick={() => run(() => b.signUp(email, password))}
+            >
+              {t('backend.signUp')}
+            </button>
+          </div>
+          {status.error && <p className="hint">{status.error}</p>}
+        </>
+      ) : (
+        <>
+          <p className="hint">
+            {t('backend.signedInAs')}: <strong>{status.user?.email}</strong>
+            <button
+              className="btn btn--small btn--ghost"
+              style={{ marginInlineStart: 8 }}
+              onClick={() => run(() => b.signOut())}
+            >
+              {t('backend.signOut')}
+            </button>
+          </p>
+
+          <div className="field">
+            <label>{t('backend.workspace')}</label>
+            <select
+              value={status.workspaceId ?? ''}
+              onChange={(e) => run(() => b.setActiveWorkspace(e.target.value))}
+            >
+              <option value="">—</option>
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.role})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {activeWs && (
+            <p className="hint">
+              {t('backend.shareCode')}: <code>{activeWs.joinCode}</code>
+              {members.length > 0 && (
+                <>
+                  {' · '}
+                  {t('backend.members')}: {members.map((m) => m.studioName || m.email).join(', ')}
+                </>
+              )}
+            </p>
+          )}
+
+          <div className="grid2">
+            <div className="field">
+              <label>{t('backend.createWs')}</label>
+              <div className="row">
+                <input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder={t('backend.wsName')} />
+                <button
+                  className="btn btn--small"
+                  disabled={!wsName || busy}
+                  onClick={() => run(() => b.createWorkspace(wsName, studio || undefined).then(() => setWsName('')))}
+                >
+                  {t('backend.createWs')}
+                </button>
+              </div>
+            </div>
+            <div className="field">
+              <label>{t('backend.joinWs')}</label>
+              <div className="row">
+                <input value={joinCode} onChange={(e) => setJoinCode(e.target.value)} placeholder={t('backend.joinCode')} />
+                <button
+                  className="btn btn--small"
+                  disabled={!joinCode || busy}
+                  onClick={() => run(() => b.joinWorkspace(joinCode, studio || undefined).then(() => setJoinCode('')))}
+                >
+                  {t('backend.joinWs')}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="field">
+            <label>{t('backend.studioName')}</label>
+            <input value={studio} onChange={(e) => setStudio(e.target.value)} placeholder={t('backend.studioName')} />
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 

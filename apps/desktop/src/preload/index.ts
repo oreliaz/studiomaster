@@ -113,6 +113,23 @@ const api: StudioMasterApi = {
     deleteIssue: (id: string) => ipcRenderer.invoke('kb:delete-issue', id),
     sync: () => ipcRenderer.invoke('kb:sync'),
   },
+  backend: {
+    getStatus: () => ipcRenderer.invoke('backend:get-status'),
+    setConfig: (url: string, anonKey: string) =>
+      ipcRenderer.invoke('backend:set-config', url, anonKey),
+    signUp: (email: string, password: string) =>
+      ipcRenderer.invoke('backend:sign-up', email, password),
+    signIn: (email: string, password: string) =>
+      ipcRenderer.invoke('backend:sign-in', email, password),
+    signOut: () => ipcRenderer.invoke('backend:sign-out'),
+    listWorkspaces: () => ipcRenderer.invoke('backend:list-workspaces'),
+    createWorkspace: (name: string, studioName?: string) =>
+      ipcRenderer.invoke('backend:create-workspace', name, studioName),
+    joinWorkspace: (joinCode: string, studioName?: string) =>
+      ipcRenderer.invoke('backend:join-workspace', joinCode, studioName),
+    setActiveWorkspace: (id: string) => ipcRenderer.invoke('backend:set-active-workspace', id),
+    listMembers: () => ipcRenderer.invoke('backend:list-members'),
+  },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),
   onRecordState: (cb: (state: ObsRecordState) => void) => subscribe(IPC_EVENTS.obsRecord, cb),
