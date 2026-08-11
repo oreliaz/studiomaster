@@ -111,6 +111,8 @@ const api: StudioMasterApi = {
     processSession: (id: string) => ipcRenderer.invoke('ai:process-session', id),
     getRunMode: () => ipcRenderer.invoke('ai:get-run-mode'),
     setRunMode: (mode: RunMode) => ipcRenderer.invoke('ai:set-run-mode', mode),
+    hasKey: () => ipcRenderer.invoke('ai:has-key'),
+    setKey: (key: string) => ipcRenderer.invoke('ai:set-key', key),
   },
   kb: {
     get: () => ipcRenderer.invoke('kb:get'),

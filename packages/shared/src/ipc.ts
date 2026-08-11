@@ -123,6 +123,10 @@ export interface StudioMasterApi {
     processSession(sessionId: string): Promise<AiJobResult>
     getRunMode(): Promise<RunMode>
     setRunMode(mode: RunMode): Promise<void>
+    /** Whether a Claude API key is configured (stored or via env). */
+    hasKey(): Promise<boolean>
+    /** Store the Claude API key (encrypted). Empty string clears it. */
+    setKey(key: string): Promise<void>
   }
   kb: {
     get(): Promise<KnowledgeBase>

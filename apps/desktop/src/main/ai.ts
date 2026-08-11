@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { app } from 'electron'
+import { app, safeStorage } from 'electron'
 import type { AiJobResult, AiProgress, RequestedDeliverables } from '@studiomaster/shared'
 import type { Store } from './store.js'
 import { ffmpegEnv } from './ffmpeg.js'
@@ -16,11 +16,43 @@ const PROGRESS_PREFIX = '@@SM@@'
  * vendored basic-editing-he / podcast-reels-he skills. Best-effort: a missing
  * Python interpreter surfaces as a clear error rather than a crash.
  */
+const ANTHROPIC_KEY = 'ai.anthropicKey'
+
 export class AiEditor {
   constructor(
     private readonly store: Store,
     private readonly onProgress: (p: AiProgress) => void = () => {},
   ) {}
+
+  /** Store the Claude API key encrypted (safeStorage/DPAPI). Empty clears it. */
+  setAnthropicKey(key: string): void {
+    const trimmed = key.trim()
+    if (!trimmed) {
+      this.store.setSetting(ANTHROPIC_KEY, '')
+      return
+    }
+    const value = safeStorage.isEncryptionAvailable()
+      ? safeStorage.encryptString(trimmed).toString('base64')
+      : trimmed
+    this.store.setSetting(ANTHROPIC_KEY, value)
+  }
+
+  hasAnthropicKey(): boolean {
+    return !!this.resolveAnthropicKey()
+  }
+
+  /** The key: the stored (decrypted) one, else the ANTHROPIC_API_KEY env var. */
+  private resolveAnthropicKey(): string | undefined {
+    const raw = this.store.getSetting(ANTHROPIC_KEY)
+    if (!raw) return process.env['ANTHROPIC_API_KEY'] || undefined
+    try {
+      return safeStorage.isEncryptionAvailable()
+        ? safeStorage.decryptString(Buffer.from(raw, 'base64'))
+        : raw
+    } catch {
+      return raw
+    }
+  }
 
   private workersDir(): string {
     if (app.isPackaged) return join(process.resourcesPath, 'ai-workers')
@@ -100,11 +132,12 @@ export class AiEditor {
   ): Promise<Record<string, unknown> | undefined> {
     return new Promise((resolvePromise, reject) => {
       const python = process.platform === 'win32' ? 'python' : 'python3'
+      const key = this.resolveAnthropicKey()
       const child = spawn(python, ['-u', '-m', 'ai_workers.pilot', sessionDir], {
         cwd: this.workersDir(),
-        // Put the bundled ffmpeg/ffprobe on PATH so the skills find them with
-        // no separate install.
-        env: ffmpegEnv(),
+        // Bundled ffmpeg/ffprobe on PATH + the Claude key, so the workers find
+        // both with no separate install / env-var setup.
+        env: ffmpegEnv(key ? { ANTHROPIC_API_KEY: key } : {}),
       })
       let buffer = ''
       let lastResult = '{}'

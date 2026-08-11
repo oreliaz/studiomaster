@@ -506,6 +506,8 @@ function registerIpc(): void {
   ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))
   ipcMain.handle('ai:get-run-mode', () => getRunMode())
   ipcMain.handle('ai:set-run-mode', (_e, mode: RunMode) => store.setSetting(RUN_MODE_KEY, mode))
+  ipcMain.handle('ai:has-key', () => ai.hasAnthropicKey())
+  ipcMain.handle('ai:set-key', (_e, key: string) => ai.setAnthropicKey(key))
 }
 
 /** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */

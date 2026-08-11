@@ -33,12 +33,15 @@ export function CloudView(): JSX.Element {
   const [runMode, setRunMode] = useState<RunMode>('ask')
   const [aiProgress, setAiProgress] = useState<Record<string, AiProgress>>({})
   const [openReview, setOpenReview] = useState<string | null>(null)
+  const [keySet, setKeySet] = useState(false)
+  const [keyInput, setKeyInput] = useState('')
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
     setStatus(s)
     setSessions(await window.studiomaster.cloud.listSessions())
     setRunMode(await window.studiomaster.ai.getRunMode())
+    setKeySet(await window.studiomaster.ai.hasKey())
     if (s.connected) setEvents(await window.studiomaster.cloud.listTodayEvents())
   }
 
@@ -61,6 +64,15 @@ export function CloudView(): JSX.Element {
   const changeRunMode = async (mode: RunMode): Promise<void> => {
     await window.studiomaster.ai.setRunMode(mode)
     setRunMode(mode)
+  }
+  const saveKey = async (): Promise<void> => {
+    await window.studiomaster.ai.setKey(keyInput)
+    setKeyInput('')
+    setKeySet(await window.studiomaster.ai.hasKey())
+  }
+  const clearKey = async (): Promise<void> => {
+    await window.studiomaster.ai.setKey('')
+    setKeySet(false)
   }
 
   const saveCreds = async (): Promise<void> => {
@@ -116,6 +128,28 @@ export function CloudView(): JSX.Element {
           {status.connected ? `מחובר · ${status.email ?? ''}` : 'לא מחובר'}
         </span>
       </header>
+
+      <section className="card">
+        <h2>{t('ai.keyTitle')}</h2>
+        <p className="hint">{t('ai.keyHint')}</p>
+        {keySet && <p className="badge badge--connected">{t('ai.keySet')}</p>}
+        <div className="row">
+          <input
+            type="password"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            placeholder={t('ai.keyPlaceholder')}
+          />
+          <button className="btn btn--small btn--primary" onClick={saveKey} disabled={!keyInput}>
+            {t('ai.keySave')}
+          </button>
+          {keySet && (
+            <button className="btn btn--small btn--danger" onClick={clearKey}>
+              {t('ai.keyClear')}
+            </button>
+          )}
+        </div>
+      </section>
 
       <section className="card">
         <div className="field">
