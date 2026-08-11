@@ -181,6 +181,22 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
   }
 }
 
+/** Process every pending session in the queue, one at a time (heavy work). */
+let queueRunning = false
+async function runQueue(): Promise<void> {
+  if (queueRunning) return
+  queueRunning = true
+  try {
+    for (;;) {
+      const next = store.listSessions().find((s) => s.editStatus === 'pending')
+      if (!next) break
+      await ai.processSession(next.id).catch((err) => console.error('[queue] job failed:', err))
+    }
+  } finally {
+    queueRunning = false
+  }
+}
+
 /** Nightly editor: while in the 00:00–08:00 window, drain pending edit jobs one at a time. */
 let nightlyRunning = false
 async function nightlyTick(): Promise<void> {
@@ -508,6 +524,11 @@ function registerIpc(): void {
   ipcMain.handle('ai:set-run-mode', (_e, mode: RunMode) => store.setSetting(RUN_MODE_KEY, mode))
   ipcMain.handle('ai:has-key', () => ai.hasAnthropicKey())
   ipcMain.handle('ai:set-key', (_e, key: string) => ai.setAnthropicKey(key))
+  ipcMain.handle('ai:process-queue', () => {
+    const pending = store.listSessions().filter((s) => s.editStatus === 'pending').length
+    void runQueue()
+    return { pending, running: queueRunning }
+  })
 }
 
 /** Global review-marker hotkeys (docs §6.2.2) — work even when OBS has focus. */

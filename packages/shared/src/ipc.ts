@@ -127,6 +127,8 @@ export interface StudioMasterApi {
     hasKey(): Promise<boolean>
     /** Store the Claude API key (encrypted). Empty string clears it. */
     setKey(key: string): Promise<void>
+    /** Run every pending session in the queue, one at a time. */
+    processQueue(): Promise<{ pending: number; running: boolean }>
   }
   kb: {
     get(): Promise<KnowledgeBase>

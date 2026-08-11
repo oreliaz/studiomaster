@@ -491,6 +491,17 @@ body {
   flex: 1;
 }
 
+/* ── editing queue ── */
+.queue-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid #1b2230;
+  margin-bottom: 12px;
+}
+
 /* ── import episode ── */
 .import-form {
   border: 1px solid #1b2230;

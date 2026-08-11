@@ -105,6 +105,10 @@ export function CloudView(): JSX.Element {
       setBusy(false)
     }
   }
+  const runQueue = async (): Promise<void> => {
+    await window.studiomaster.ai.processQueue()
+    await refresh()
+  }
   const openFolder = async (id: string): Promise<void> => {
     const err = await window.studiomaster.sessions.openFolder(id)
     if (err) alert(`לא ניתן לפתוח את התיקייה: ${err}`)
@@ -227,8 +231,9 @@ export function CloudView(): JSX.Element {
       )}
 
       <section className="card">
-        <h2>הקלטות</h2>
+        <h2>{t('queue.title')}</h2>
         <ImportEpisode onImported={refresh} />
+        <QueueBar sessions={sessions} onRunAll={runQueue} />
         {sessions.length === 0 && <p className="hint">אין הקלטות עדיין.</p>}
         <ul className="session-list">
           {sessions.map((s) => (
@@ -315,6 +320,35 @@ function EditStatusLine({
       {label}
       {summary ? ` · ${summary}` : ''}
     </span>
+  )
+}
+
+/** Queue summary + a 'run the whole queue' button (processes all pending). */
+function QueueBar({
+  sessions,
+  onRunAll,
+}: {
+  sessions: SessionSummary[]
+  onRunAll: () => void
+}): JSX.Element {
+  const pending = sessions.filter((s) => s.editStatus === 'pending').length
+  const running = sessions.filter((s) => s.editStatus === 'running').length
+  const done = sessions.filter((s) => s.editStatus === 'done').length
+  const counts = t('queue.counts')
+    .replace('{pending}', String(pending))
+    .replace('{running}', String(running))
+    .replace('{done}', String(done))
+  return (
+    <div className="queue-bar">
+      <span className="hint">{pending + running === 0 ? t('queue.empty') : counts}</span>
+      <button
+        className="btn btn--small btn--primary"
+        onClick={onRunAll}
+        disabled={pending === 0 || running > 0}
+      >
+        {t('queue.runAll')}
+      </button>
+    </div>
   )
 }
 
