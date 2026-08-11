@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { ffmpeg, ffprobe } from './ffmpeg.js'
 
 /**
  * Separate-audio-per-microphone (requirement 2). When OBS records with
@@ -40,7 +41,7 @@ function sanitize(name: string): string {
 /** Probe the audio streams of a media file (empty if ffprobe is unavailable). */
 export async function probeAudioStreams(file: string): Promise<AudioStream[]> {
   try {
-    const { code, stdout } = await run('ffprobe', [
+    const { code, stdout } = await run(ffprobe, [
       '-v',
       'error',
       '-select_streams',
@@ -94,7 +95,7 @@ export async function splitAudioTracks(
     const label = stream.title ? `-${sanitize(stream.title)}` : ''
     const out = join(outDir, `track${n}${label}.wav`)
     try {
-      const { code } = await run('ffmpeg', [
+      const { code } = await run(ffmpeg, [
         '-y',
         '-i',
         recordingPath,

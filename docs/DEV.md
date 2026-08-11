@@ -4,7 +4,9 @@
 
 - **Node.js 20+** ו-**npm**.
 - **OBS Studio 28+** עם obs-websocket מופעל (Tools → WebSocket Server Settings, פורט 4455).
-- ל-Phase 4 (עריכת AI): **Python 3.11+**, ו-**ffmpeg/ffprobe** ב-PATH לרינדור.
+- ל-Phase 4 (עריכת AI): **Python 3.11+**. **ffmpeg/ffprobe מגיעים מובנים** (חבילות
+  `ffmpeg-static`/`ffprobe-static` שיורדות ב-`npm install`); StudioMaster מוסיף אותם
+  אוטומטית ל-PATH של סוכני העריכה. אין צורך להתקין ffmpeg בנפרד.
 
 ## התקנה
 

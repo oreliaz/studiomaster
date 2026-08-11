@@ -13,7 +13,7 @@
 | **OBS Studio 28+** | מנוע ההקלטה | obsproject.com |
 | **Node.js 20+** | להריץ את StudioMaster | nodejs.org |
 | **Python 3.11+** | סוכני העריכה | python.org (סמן "Add to PATH") |
-| **ffmpeg + ffprobe** | חיתוך/רינדור וידאו | gyan.dev/ffmpeg (הוסף ל-PATH) |
+| **ffmpeg + ffprobe** | חיתוך/רינדור וידאו | **מובנה** ב-StudioMaster (יורד ב-`npm install`) — לא צריך להתקין |
 
 ### 1. התקנת StudioMaster
 

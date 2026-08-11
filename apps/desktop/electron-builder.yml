@@ -6,6 +6,10 @@ directories:
 files:
   - out/**/*
   - package.json
+# ffmpeg/ffprobe ship inside the app; unpack the binaries so they're executable.
+asarUnpack:
+  - node_modules/ffmpeg-static/**
+  - node_modules/ffprobe-static/**
 # Bundle the Python editing workers + editing skills next to the app (docs §6.4).
 extraResources:
   - from: ../../services/ai-workers

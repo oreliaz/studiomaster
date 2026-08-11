@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path'
 import { app } from 'electron'
 import type { AiJobResult, AiProgress, RequestedDeliverables } from '@studiomaster/shared'
 import type { Store } from './store.js'
+import { ffmpegEnv } from './ffmpeg.js'
 
 /** Sentinel prefix the Python pilot uses for streamed progress lines. */
 const PROGRESS_PREFIX = '@@SM@@'
@@ -101,6 +102,9 @@ export class AiEditor {
       const python = process.platform === 'win32' ? 'python' : 'python3'
       const child = spawn(python, ['-u', '-m', 'ai_workers.pilot', sessionDir], {
         cwd: this.workersDir(),
+        // Put the bundled ffmpeg/ffprobe on PATH so the skills find them with
+        // no separate install.
+        env: ffmpegEnv(),
       })
       let buffer = ''
       let lastResult = '{}'

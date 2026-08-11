@@ -19,6 +19,8 @@
     "@studiomaster/ptz-control": "*",
     "@studiomaster/shared": "*",
     "@studiomaster/studio-launcher": "*",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
     "googleapis": "^144.0.0",
     "obs-websocket-js": "^5.0.6",
     "zod": "^3.23.8"
