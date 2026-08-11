@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { app } from 'electron'
-import type { AiJobResult, AiProgress } from '@studiomaster/shared'
+import type { AiJobResult, AiProgress, RequestedDeliverables } from '@studiomaster/shared'
 import type { Store } from './store.js'
 
 /** Sentinel prefix the Python pilot uses for streamed progress lines. */
@@ -47,10 +47,20 @@ export class AiEditor {
     const guideline = key
       ? kb.podcastNotes.find((n) => n.podcastName.trim().toLowerCase() === key)
       : undefined
+    // Which deliverables to produce: an explicit per-episode selection (e.g. an
+    // imported, self-edited episode) wins; otherwise derive from the template.
+    const requested: RequestedDeliverables = session.requested ?? {
+      basic: deliverables.editType === 'basic' || deliverables.editType === 'both',
+      reels: deliverables.editType === 'reels' || deliverables.editType === 'both',
+      title: !!deliverables.title,
+      description: !!deliverables.description,
+      thumbnail: !!deliverables.thumbnail,
+    }
     const job = {
       sessionId,
       capturePath: session.capturePath ?? '',
       deliverables,
+      requested,
       notes: session.editNotes ?? '',
       podcastGuidelines: guideline?.notes ?? '',
     }
@@ -152,6 +162,11 @@ function summarize(summary: Record<string, unknown> | undefined): string {
   } else if (reels?.planned_clips) {
     parts.push(`${reels.planned_clips} רילסים (מתוכננים)`)
   }
+  const meta = summary['metadata'] as { title?: string; description?: string } | null
+  if (meta?.title) parts.push('כותרת ✓')
+  if (meta?.description) parts.push('תיאור ✓')
+  const thumb = summary['thumbnail'] as { count?: number } | null
+  if (thumb?.count) parts.push(`${thumb.count} תמבנייל`)
   if (summary['error']) parts.push(`שגיאה: ${summary['error']}`)
   return parts.join(' · ')
 }

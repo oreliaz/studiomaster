@@ -19,6 +19,16 @@ export interface CalendarEvent {
 
 export type EditStatus = 'idle' | 'pending' | 'running' | 'done' | 'error'
 
+/** Which deliverables to produce for a session — pick part or all. */
+export interface RequestedDeliverables {
+  /** Full-episode basic edit (skip when the user edited it themselves). */
+  basic: boolean
+  reels: boolean
+  title: boolean
+  description: boolean
+  thumbnail: boolean
+}
+
 export interface SessionSummary {
   id: string
   title?: string
@@ -42,6 +52,11 @@ export interface SessionSummary {
   /** Per-episode intro/outro overrides (win over the podcast's defaults). */
   introOverride?: string
   outroOverride?: string
+  /** Explicit per-episode deliverable selection (e.g. an imported, self-edited
+   *  episode that only needs reels + title). Overrides the podcast defaults. */
+  requested?: RequestedDeliverables
+  /** True when the source is a file the user imported (already edited). */
+  imported?: boolean
 }
 
 /** Fields the review UI can change on a session before a re-edit. */

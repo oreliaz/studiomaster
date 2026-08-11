@@ -83,6 +83,10 @@ export const deliverableTemplateSchema = z.object({
   reelStyle: z.enum(['simple', 'premium']).default('simple'),
   reelMinSec: z.number().int().positive().default(40),
   reelMaxSec: z.number().int().positive().default(70),
+  // Metadata deliverables (independent of the edit type above).
+  title: z.boolean().default(false),
+  description: z.boolean().default(false),
+  thumbnail: z.boolean().default(false),
   // Delivery.
   socialUpload: z.boolean().default(false),
 })

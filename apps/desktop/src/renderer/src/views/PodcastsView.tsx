@@ -204,6 +204,33 @@ export function PodcastsView(): JSX.Element {
                   {t('q.socialUpload')}
                 </label>
               </div>
+
+              <div className="checks-row">
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={d.title}
+                    onChange={(e) => patchDeliverables({ title: e.target.checked })}
+                  />
+                  {t('import.metaTitle')}
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={d.description}
+                    onChange={(e) => patchDeliverables({ description: e.target.checked })}
+                  />
+                  {t('import.metaDesc')}
+                </label>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={d.thumbnail}
+                    onChange={(e) => patchDeliverables({ thumbnail: e.target.checked })}
+                  />
+                  {t('import.thumb')}
+                </label>
+              </div>
             </section>
 
             <div className="editor__footer">

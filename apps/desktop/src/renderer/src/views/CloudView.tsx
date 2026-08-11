@@ -5,6 +5,8 @@ import {
   type CalendarEvent,
   type EditStatus,
   type GoogleAuthStatus,
+  type Podcast,
+  type RequestedDeliverables,
   type ReviewMarker,
   type RunMode,
   type SessionSummary,
@@ -192,6 +194,7 @@ export function CloudView(): JSX.Element {
 
       <section className="card">
         <h2>הקלטות</h2>
+        <ImportEpisode onImported={refresh} />
         {sessions.length === 0 && <p className="hint">אין הקלטות עדיין.</p>}
         <ul className="session-list">
           {sessions.map((s) => (
@@ -278,6 +281,114 @@ function EditStatusLine({
       {label}
       {summary ? ` · ${summary}` : ''}
     </span>
+  )
+}
+
+/** Import a self-edited episode and choose which deliverables to produce. */
+function ImportEpisode({ onImported }: { onImported: () => void }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [file, setFile] = useState('')
+  const [podcasts, setPodcasts] = useState<Podcast[]>([])
+  const [podcastId, setPodcastId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [req, setReq] = useState<RequestedDeliverables>({
+    basic: false,
+    reels: true,
+    title: true,
+    description: true,
+    thumbnail: true,
+  })
+
+  useEffect(() => {
+    if (open) {
+      void window.studiomaster.podcasts.list().then(async (list) => {
+        setPodcasts(list)
+        setPodcastId((await window.studiomaster.podcasts.getActive()) ?? list[0]?.id ?? '')
+      })
+    }
+  }, [open])
+
+  const pick = async (): Promise<void> => {
+    const path = await window.studiomaster.sessions.pickVideo()
+    if (path) setFile(path)
+  }
+  const toggle = (k: keyof RequestedDeliverables) => setReq((r) => ({ ...r, [k]: !r[k] }))
+
+  const queue = async (): Promise<void> => {
+    if (!file) {
+      alert(t('import.needFile'))
+      return
+    }
+    setBusy(true)
+    try {
+      await window.studiomaster.sessions.importEpisode({
+        filePath: file,
+        podcastId: podcastId || undefined,
+        requested: req,
+      })
+      setOpen(false)
+      setFile('')
+      onImported()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button className="btn btn--small btn--primary" onClick={() => setOpen(true)}>
+        {t('import.add')}
+      </button>
+    )
+  }
+
+  const boxes: { key: keyof RequestedDeliverables; label: string }[] = [
+    { key: 'basic', label: t('import.basic') },
+    { key: 'reels', label: t('import.reels') },
+    { key: 'title', label: t('import.metaTitle') },
+    { key: 'description', label: t('import.metaDesc') },
+    { key: 'thumbnail', label: t('import.thumb') },
+  ]
+
+  return (
+    <div className="import-form">
+      <h3>{t('import.title')}</h3>
+      <div className="import-form__file">
+        <button className="btn btn--small" onClick={pick}>
+          {t('import.pick')}
+        </button>
+        <span className="hint">{file || '—'}</span>
+      </div>
+      {podcasts.length > 0 && (
+        <div className="field">
+          <label>{t('import.podcast')}</label>
+          <select value={podcastId} onChange={(e) => setPodcastId(e.target.value)}>
+            {podcasts.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <label className="hint">{t('import.deliverables')}</label>
+      <div className="checks-row">
+        {boxes.map((b) => (
+          <label className="check" key={b.key}>
+            <input type="checkbox" checked={req[b.key]} onChange={() => toggle(b.key)} />
+            {b.label}
+          </label>
+        ))}
+      </div>
+      <div className="actions">
+        <button className="btn btn--small" onClick={() => setOpen(false)}>
+          {t('import.cancel')}
+        </button>
+        <button className="btn btn--small btn--primary" onClick={queue} disabled={busy || !file}>
+          {t('import.queue')}
+        </button>
+      </div>
+    </div>
   )
 }
 

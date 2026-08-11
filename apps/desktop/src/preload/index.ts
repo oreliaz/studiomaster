@@ -10,6 +10,7 @@ import {
   type PtzMoveCommand,
   type PtzPresetCommand,
   type PtzZoomCommand,
+  type RequestedDeliverables,
   type ReviewMarker,
   type ReviewMarkerCategory,
   type RunMode,
@@ -87,6 +88,13 @@ const api: StudioMasterApi = {
     updateEdit: (sessionId: string, patch: SessionEditPatch) =>
       ipcRenderer.invoke('sessions:update-edit', sessionId, patch),
     openFolder: (sessionId: string) => ipcRenderer.invoke('sessions:open-folder', sessionId),
+    pickVideo: () => ipcRenderer.invoke('sessions:pick-video'),
+    importEpisode: (input: {
+      filePath: string
+      podcastId?: string
+      requested: RequestedDeliverables
+      title?: string
+    }) => ipcRenderer.invoke('sessions:import', input),
   },
   cloud: {
     getAuthStatus: () => ipcRenderer.invoke('cloud:get-auth-status'),

@@ -27,9 +27,11 @@ import subprocess
 from pathlib import Path
 
 from .cuts import markers_to_cuts_txt
+from .metadata import fallback_metadata, generate_metadata
 from .models import Marker
 from .reels_plan import propose_specs, spec_to_arg
 from .reels_select import ClipPick, load_transcript, select_clips
+from .thumbnail import extract_thumbnails
 
 SKILLS_DIR = Path(__file__).resolve().parents[2] / "skills"
 BASIC_SKILL = SKILLS_DIR / "basic-editing-he"
@@ -143,6 +145,64 @@ def _hook_for(markers: list[Marker], start_s: float, end_s: float) -> str:
     return fallback
 
 
+def _ensure_transcript(work: Path, capture: Path) -> dict | None:
+    """Transcribe the full episode once (shared by reels + metadata). Returns the
+    step dict if it ran, or None if the transcript already exists."""
+    out = work / "transcript.txt"
+    if out.exists() and (work / "transcript.json").exists():
+        return None
+    return _run(
+        ["python", str(REELS_SKILL / "scripts" / "transcribe_full.py"), str(capture), str(out)],
+        env={"CT2_FORCE_CPU_ISA": "GENERIC"},
+    )
+
+
+def run_metadata(work: Path, capture: Path, job: dict, want_title: bool, want_desc: bool,
+                 dry_run: bool, base: float = 0.0, span: float = 1.0) -> dict:
+    """Generate the episode title + description from the transcript."""
+    if dry_run:
+        return {"skill": "metadata", "dry_run": True}
+    steps: list[dict] = []
+    emit("metadata-transcribe", base + span * 0.1, "מתמלל לכותרת/תיאור")
+    tr = _ensure_transcript(work, capture)
+    if tr:
+        steps.append(tr)
+    transcript_text = ""
+    tp = work / "transcript.txt"
+    if tp.exists():
+        transcript_text = tp.read_text("utf-8", errors="ignore")
+
+    emit("metadata-generate", base + span * 0.6, "מייצר כותרת ותיאור")
+    d = job.get("deliverables", {})
+    guidance = " ".join(x for x in (job.get("notes", ""), job.get("podcastGuidelines", "")) if x)
+    meta = generate_metadata(transcript_text, d.get("language", "he"), guidance) or fallback_metadata(
+        transcript_text
+    )
+    if want_title:
+        (work / "title.txt").write_text(meta.get("title", ""), "utf-8")
+    if want_desc:
+        (work / "description.txt").write_text(meta.get("description", ""), "utf-8")
+    (work / "metadata.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), "utf-8")
+    emit("metadata-done", base + span, "כותרת ותיאור מוכנים")
+    return {
+        "skill": "metadata",
+        "steps": steps,
+        "title": meta.get("title") if want_title else None,
+        "description": meta.get("description") if want_desc else None,
+    }
+
+
+def run_thumbnail(work: Path, capture: Path, markers: list[Marker], duration_ms: int,
+                  dry_run: bool, base: float = 0.0, span: float = 1.0) -> dict:
+    """Extract candidate thumbnail frames at highlights / evenly spaced."""
+    if dry_run:
+        return {"skill": "thumbnail", "dry_run": True}
+    emit("thumbnail", base + span * 0.3, "מחלץ תמונות לתמבנייל")
+    files = extract_thumbnails(str(capture), markers, duration_ms, work / "thumbnails")
+    emit("thumbnail-done", base + span, f"{len(files)} תמונות תמבנייל")
+    return {"skill": "thumbnail", "count": len(files), "files": files}
+
+
 def _plan_clips(
     work: Path, markers: list[Marker], duration_ms: int, count: int, min_s: int, max_s: int,
     deliverables: dict, guidance: str = "",
@@ -224,12 +284,11 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     out_dir.mkdir(exist_ok=True)
     whisper_env = {"CT2_FORCE_CPU_ISA": "GENERIC"}
 
-    # 1) full-episode transcript (drives smart clip selection + reference).
+    # 1) full-episode transcript (drives smart clip selection; shared w/ metadata).
     emit("reels-transcribe", base + span * 0.05, "מתמלל את הפרק")
-    steps.append(
-        _run(["python", str(REELS_SKILL / "scripts" / "transcribe_full.py"),
-              str(capture), str(work / "transcript.txt")], env=whisper_env)
-    )
+    tr = _ensure_transcript(work, capture)
+    if tr:
+        steps.append(tr)
 
     # 2) choose clip windows: model-based from the transcript, else marker-driven.
     #    Human correction notes + the podcast's KB guidelines steer the model.
@@ -295,6 +354,7 @@ def process(session_dir: Path, dry_run: bool) -> dict:
     ]
     deliverables = job.get("deliverables", {})
     edit_type = deliverables.get("editType", "basic")
+    req = _resolve_requested(job, deliverables, edit_type)
 
     # Prepare skill inputs regardless of which skill runs.
     (session_dir / "cuts.txt").write_text(markers_to_cuts_txt(markers), "utf-8")
@@ -302,10 +362,12 @@ def process(session_dir: Path, dry_run: bool) -> dict:
 
     capture = Path(job.get("capturePath", ""))
     capture_ok = capture.exists()
+    duration = _probe_duration_ms(capture) or (max((m.tc_ms for m in markers), default=0) + 60_000)
 
     result: dict = {
         "session_dir": str(session_dir),
         "edit_type": edit_type,
+        "requested": req,
         "language": deliverables.get("language", "he"),
         "capture": str(capture),
         "capture_found": capture_ok,
@@ -315,6 +377,8 @@ def process(session_dir: Path, dry_run: bool) -> dict:
         "dry_run": dry_run,
         "basic": None,
         "reels": None,
+        "metadata": None,
+        "thumbnail": None,
     }
     if not capture_ok and not dry_run:
         result["error"] = "capture file not found — set capturePath in job.json"
@@ -322,15 +386,46 @@ def process(session_dir: Path, dry_run: bool) -> dict:
         return result
 
     emit("start", 0.02, "מכין קלט לעריכה")
-    both = edit_type == "both"
-    if edit_type in ("basic", "both"):
-        result["basic"] = run_basic(session_dir, capture, dry_run,
-                                    base=0.02, span=(0.53 if both else 0.93))
-    if edit_type in ("reels", "both"):
-        result["reels"] = run_reels(session_dir, capture, job, markers, dry_run,
-                                    base=(0.55 if both else 0.02), span=(0.43 if both else 0.93))
+    # Allocate the progress bar across the enabled stages, weighted by cost.
+    weights = {"basic": 3.0, "reels": 4.0, "metadata": 1.0, "thumbnail": 1.0}
+    stages = [
+        name
+        for name in ("basic", "reels", "metadata", "thumbnail")
+        if (name == "metadata" and (req["title"] or req["description"])) or req.get(name)
+    ]
+    total_w = sum(weights[s] for s in stages) or 1.0
+    cursor = 0.02
+    for name in stages:
+        span = 0.96 * (weights[name] / total_w)
+        base = cursor
+        cursor += span
+        if name == "basic":
+            result["basic"] = run_basic(session_dir, capture, dry_run, base, span)
+        elif name == "reels":
+            result["reels"] = run_reels(session_dir, capture, job, markers, dry_run, base, span)
+        elif name == "metadata":
+            result["metadata"] = run_metadata(session_dir, capture, job, req["title"],
+                                              req["description"], dry_run, base, span)
+        elif name == "thumbnail":
+            result["thumbnail"] = run_thumbnail(session_dir, capture, markers, duration,
+                                               dry_run, base, span)
     emit("done", 1.0, "העריכה הושלמה")
     return result
+
+
+def _resolve_requested(job: dict, deliverables: dict, edit_type: str) -> dict:
+    """Which deliverables to produce: explicit `requested` wins, else derive
+    from the editType + metadata flags on the template."""
+    r = job.get("requested")
+    if isinstance(r, dict):
+        return {k: bool(r.get(k, False)) for k in ("basic", "reels", "title", "description", "thumbnail")}
+    return {
+        "basic": edit_type in ("basic", "both"),
+        "reels": edit_type in ("reels", "both"),
+        "title": bool(deliverables.get("title")),
+        "description": bool(deliverables.get("description")),
+        "thumbnail": bool(deliverables.get("thumbnail")),
+    }
 
 
 def main() -> None:

@@ -7,6 +7,7 @@ import type { PtzMoveCommand, PtzPresetCommand, PtzZoomCommand } from './ptz.js'
 import type {
   CalendarEvent,
   GoogleAuthStatus,
+  RequestedDeliverables,
   RunMode,
   SessionEditPatch,
   SessionSummary,
@@ -95,6 +96,15 @@ export interface StudioMasterApi {
     updateEdit(sessionId: string, patch: SessionEditPatch): Promise<SessionSummary | null>
     /** Open the recording's folder in the OS file manager. Returns '' on success. */
     openFolder(sessionId: string): Promise<string>
+    /** Open a file picker for a video; returns the chosen path or null. */
+    pickVideo(): Promise<string | null>
+    /** Queue an externally-edited episode with a chosen set of deliverables. */
+    importEpisode(input: {
+      filePath: string
+      podcastId?: string
+      requested: RequestedDeliverables
+      title?: string
+    }): Promise<SessionSummary>
   }
   cloud: {
     getAuthStatus(): Promise<GoogleAuthStatus>

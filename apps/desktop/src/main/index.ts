@@ -1,6 +1,7 @@
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
+import { mkdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
+import { app, dialog, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { ObsController } from '@studiomaster/obs-controller'
 import { createPtzController, type PtzController } from '@studiomaster/ptz-control'
 import { createLightingAdapter } from '@studiomaster/lighting'
@@ -18,8 +19,10 @@ import {
   type PtzPresetCommand,
   type PtzZoomCommand,
   type ReviewMarkerCategory,
+  type RequestedDeliverables,
   type RunMode,
   type SessionEditPatch,
+  type SessionSummary,
   type StudioProfile,
   type WizardState,
 } from '@studiomaster/shared'
@@ -399,6 +402,53 @@ function registerIpc(): void {
     if (!s?.storagePath) return 'הקלטה לא נמצאה'
     return shell.openPath(s.storagePath) // '' on success, else the OS error message
   })
+  // Pick a video file to import (a self-edited episode).
+  ipcMain.handle('sessions:pick-video', async () => {
+    const res = await dialog.showOpenDialog({
+      title: 'בחר קובץ וידאו',
+      properties: ['openFile'],
+      filters: [{ name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'm4v', 'avi', 'webm'] }],
+    })
+    return res.canceled ? null : (res.filePaths[0] ?? null)
+  })
+  // Queue an externally-edited episode with a chosen subset of deliverables.
+  ipcMain.handle(
+    'sessions:import',
+    (
+      _e,
+      input: {
+        filePath: string
+        podcastId?: string
+        requested: RequestedDeliverables
+        title?: string
+      },
+    ) => {
+      const startedAt = new Date().toISOString()
+      const stamp = startedAt.replace(/[:.]/g, '-')
+      const storagePath = join(app.getPath('userData'), 'recordings', `import-${stamp}`)
+      mkdirSync(storagePath, { recursive: true })
+      const podcastId = input.podcastId ?? store.getSetting(ACTIVE_PODCAST_KEY) ?? undefined
+      const mode = sessionRunMode(podcastId)
+      const session: SessionSummary = {
+        id: randomUUID(),
+        startedAt,
+        storagePath,
+        capturePath: input.filePath,
+        podcastId,
+        title: input.title || basename(input.filePath),
+        guests: [],
+        uploaded: false,
+        requested: input.requested,
+        imported: true,
+        editStatus: mode === 'now' ? 'running' : 'pending',
+      }
+      store.saveSession(session)
+      if (mode === 'now') {
+        void ai.processSession(session.id).catch((err) => console.error('[ai] import run failed:', err))
+      }
+      return session
+    },
+  )
 
   // Cloud (Google Drive + Calendar)
   ipcMain.handle('cloud:get-auth-status', () => cloud.getAuthStatus())
