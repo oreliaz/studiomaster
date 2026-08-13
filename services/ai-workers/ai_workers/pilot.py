@@ -339,10 +339,32 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     steps.extend(renders)
 
     outputs = sorted(str(p) for p in out_dir.glob("*.mp4"))
+
+    # Diagnose the common "planned clips but nothing rendered" case so the app
+    # can tell the user WHY no teasers came out, instead of failing silently.
+    note = ""
+    if specs and not outputs:
+        transcript_ok = (work / "transcript.txt").exists() and (
+            work / "transcript.txt"
+        ).stat().st_size > 0
+        words_ok = any(words_dir.glob("*_words.json")) if words_dir.exists() else False
+        caps_ok = any(captions_dir.glob("*.json")) if captions_dir.exists() else False
+        clips_ok = bool(clip_files)
+        if not clips_ok:
+            note = "החיתוך נכשל — בדוק ש-ffmpeg זמין ושהקובץ תקין"
+        elif not transcript_ok or not words_ok:
+            note = ("התמלול נכשל — התקן פעם אחת את מנוע התמלול: "
+                    "services/skills/podcast-reels-he/install.ps1 (Python + מודל Whisper)")
+        elif not caps_ok:
+            note = "לא נוצרו כתוביות מהתמלול"
+        else:
+            note = ("הרינדור נכשל — לסגנון כריסלייט צריך Node + Chrome "
+                    "(install.ps1 של הסקיל). נסה סגנון 'פשוט' לבדיקה")
+
     emit("reels-done", base + span, f"{len(outputs)} רילסים מוכנים")
     return {"skill": "podcast-reels-he", "style": style, "premium": premium,
             "selection": selection, "planned_clips": len(specs), "rendered": len(outputs),
-            "steps": steps, "outputs": outputs}
+            "note": note, "steps": steps, "outputs": outputs}
 
 
 def process(session_dir: Path, dry_run: bool) -> dict:

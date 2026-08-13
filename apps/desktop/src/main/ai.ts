@@ -192,10 +192,13 @@ function summarize(summary: Record<string, unknown> | undefined): string {
     planned_clips?: number
     rendered?: number
     selection?: string
+    note?: string
   } | null
   if (reels?.rendered) {
     const how = reels.selection === 'model' ? ' (בחירה חכמה)' : ''
     parts.push(`${reels.rendered} רילסים ✓${how}`)
+  } else if (reels?.note) {
+    parts.push(`רילסים נכשלו — ${reels.note}`)
   } else if (reels?.planned_clips) {
     parts.push(`${reels.planned_clips} רילסים (מתוכננים)`)
   }
