@@ -26,6 +26,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .brief import build_brief
 from .cuts import markers_to_cuts_txt
 from .metadata import fallback_metadata, generate_metadata
 from .models import Marker
@@ -431,6 +432,16 @@ def process(session_dir: Path, dry_run: bool) -> dict:
         elif name == "thumbnail":
             result["thumbnail"] = run_thumbnail(session_dir, capture, markers, duration,
                                                dry_run, base, span)
+
+    # Handoff brief (transcript + timecodes + cuts + notes) for Claude Code.
+    try:
+        (session_dir / "edit-brief.md").write_text(
+            build_brief(session_dir, job, markers, result), "utf-8"
+        )
+        result["brief"] = "edit-brief.md"
+    except Exception as exc:  # noqa: BLE001
+        print(f"[brief] failed: {exc}", flush=True)
+
     emit("done", 1.0, "העריכה הושלמה")
     return result
 
