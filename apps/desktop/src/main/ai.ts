@@ -142,6 +142,16 @@ export class AiEditor {
       let buffer = ''
       let lastResult = '{}'
       let err = ''
+      let logBuf = `# StudioMaster edit log\npython: ${python}\ncwd: ${this.workersDir()}\n` +
+        `anthropicKey: ${key ? 'set' : 'none'}\n\n`
+      const logPath = join(sessionDir, 'edit-log.txt')
+      const flushLog = (): void => {
+        try {
+          writeFileSync(logPath, logBuf, 'utf8')
+        } catch {
+          /* logging is best-effort */
+        }
+      }
 
       const handleLine = (line: string): void => {
         const trimmed = line.trim()
@@ -162,15 +172,27 @@ export class AiEditor {
       }
 
       child.stdout.on('data', (d) => {
-        buffer += d.toString()
+        const s = d.toString()
+        logBuf += s
+        buffer += s
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? '' // keep the incomplete tail
         for (const line of lines) handleLine(line)
       })
-      child.stderr.on('data', (d) => (err += d.toString()))
-      child.on('error', (e) => reject(new Error(`לא ניתן להריץ Python (${python}): ${e.message}`)))
+      child.stderr.on('data', (d) => {
+        const s = d.toString()
+        err += s
+        logBuf += s
+      })
+      child.on('error', (e) => {
+        logBuf += `\n[spawn error] ${e.message}\n(Python may not be installed / not on PATH)\n`
+        flushLog()
+        reject(new Error(`לא ניתן להריץ Python (${python}): ${e.message}`))
+      })
       child.on('close', (code) => {
         if (buffer) handleLine(buffer)
+        logBuf += `\n[exit code] ${code}\n`
+        flushLog()
         if (code !== 0) return reject(new Error(err.trim() || `pilot exited with code ${code}`))
         try {
           resolvePromise(JSON.parse(lastResult) as Record<string, unknown>)
