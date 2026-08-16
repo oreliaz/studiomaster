@@ -117,6 +117,11 @@ export interface StudioMasterApi {
     recognizeSession(sessionId: string): Promise<SessionSummary | null>
     /** Upload all files in a session's folder to Drive (progress via event). */
     uploadSession(sessionId: string): Promise<SessionSummary | null>
+    /** Upload every session that hasn't been uploaded yet, same folder structure. */
+    uploadAll(): Promise<{ uploaded: number; total: number }>
+    /** Whether recordings auto-upload to Drive after editing. */
+    getAutoUpload(): Promise<boolean>
+    setAutoUpload(on: boolean): Promise<void>
   }
   ai: {
     /** Run the autonomous editing pipeline over a recording session. */

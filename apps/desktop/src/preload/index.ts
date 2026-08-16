@@ -106,6 +106,9 @@ const api: StudioMasterApi = {
     listSessions: () => ipcRenderer.invoke('cloud:list-sessions'),
     recognizeSession: (id: string) => ipcRenderer.invoke('cloud:recognize-session', id),
     uploadSession: (id: string) => ipcRenderer.invoke('cloud:upload-session', id),
+    uploadAll: () => ipcRenderer.invoke('cloud:upload-all'),
+    getAutoUpload: () => ipcRenderer.invoke('cloud:get-auto-upload'),
+    setAutoUpload: (on: boolean) => ipcRenderer.invoke('cloud:set-auto-upload', on),
   },
   ai: {
     processSession: (id: string) => ipcRenderer.invoke('ai:process-session', id),

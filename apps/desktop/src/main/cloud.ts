@@ -1,5 +1,5 @@
-import { readdirSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import {
   emptyKnowledgeBase,
   mergeKnowledgeBase,
@@ -112,27 +112,37 @@ export class CloudService {
     const folderName = session.title ? `${session.title} — ${session.startedAt}` : session.startedAt
     const folderId = await drive.ensureFolder(folderName, root)
 
-    const files = readdirSync(session.storagePath).filter((f) =>
-      statSync(join(session.storagePath, f)).isFile(),
-    )
+    // Everything in the session folder (edit, brief, audio tracks, reels…) plus
+    // the raw recording itself — which for OBS captures lives outside the folder.
+    const paths = readdirSync(session.storagePath)
+      .map((f) => join(session.storagePath, f))
+      .filter((p) => statSync(p).isFile())
+    if (
+      session.capturePath &&
+      existsSync(session.capturePath) &&
+      dirname(session.capturePath) !== session.storagePath
+    ) {
+      paths.push(session.capturePath) // raw material
+    }
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!
+    for (let i = 0; i < paths.length; i++) {
+      const path = paths[i]!
+      const file = path.split(/[\\/]/).pop() ?? path
       this.emitProgress({
         sessionId,
         file,
         fileIndex: i + 1,
-        fileCount: files.length,
+        fileCount: paths.length,
         state: 'uploading',
       })
       try {
-        await drive.uploadFile(join(session.storagePath, file), folderId)
+        await drive.uploadFile(path, folderId)
       } catch (err) {
         this.emitProgress({
           sessionId,
           file,
           fileIndex: i + 1,
-          fileCount: files.length,
+          fileCount: paths.length,
           state: 'error',
           error: err instanceof Error ? err.message : String(err),
         })
@@ -143,8 +153,8 @@ export class CloudService {
     this.emitProgress({
       sessionId,
       file: '',
-      fileIndex: files.length,
-      fileCount: files.length,
+      fileIndex: paths.length,
+      fileCount: paths.length,
       state: 'done',
     })
     const updated: SessionSummary = { ...session, uploaded: true, driveFolderId: folderId }

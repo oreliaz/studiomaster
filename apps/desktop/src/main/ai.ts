@@ -81,9 +81,11 @@ export class AiEditor {
       ? kb.podcastNotes.find((n) => n.podcastName.trim().toLowerCase() === key)
       : undefined
     // Which deliverables to produce: an explicit per-episode selection (e.g. an
-    // imported, self-edited episode) wins; otherwise derive from the template.
+    // imported, self-edited episode) wins. Otherwise this is a studio recording,
+    // and every studio episode gets the full-episode basic edit (+ work brief +
+    // raw material), plus whatever else the podcast asks for.
     const requested: RequestedDeliverables = session.requested ?? {
-      basic: deliverables.editType === 'basic' || deliverables.editType === 'both',
+      basic: true,
       reels: deliverables.editType === 'reels' || deliverables.editType === 'both',
       title: !!deliverables.title,
       description: !!deliverables.description,

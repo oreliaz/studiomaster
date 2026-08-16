@@ -7,6 +7,7 @@ import { createPtzController, type PtzController } from '@studiomaster/ptz-contr
 import { createLightingAdapter } from '@studiomaster/lighting'
 import {
   IPC_EVENTS,
+  type AiJobResult,
   type InputLevel,
   type ObsConnectionParams,
   type ObsConnectionState,
@@ -41,6 +42,23 @@ const MARKER_OVERLAY_SOURCE = 'StudioMaster Marker'
 const ACTIVE_PROFILE_KEY = 'active.profile'
 const ACTIVE_PODCAST_KEY = 'active.podcast'
 const RUN_MODE_KEY = 'run.mode'
+const AUTO_UPLOAD_KEY = 'upload.autoAfterEdit'
+
+/** Auto-upload to Drive after an edit finishes (default on; no-op if not connected). */
+function autoUploadEnabled(): boolean {
+  return (store.getSetting(AUTO_UPLOAD_KEY) ?? 'true') !== 'false'
+}
+
+/** Edit a session, then (if enabled + connected) upload the whole folder to Drive. */
+async function runEdit(sessionId: string): Promise<AiJobResult> {
+  const result = await ai.processSession(sessionId)
+  if (result.ok && autoUploadEnabled() && cloud.getAuthStatus().connected) {
+    await cloud
+      .uploadSession(sessionId)
+      .catch((err) => console.error('[upload] auto-upload failed:', err))
+  }
+  return result
+}
 
 /** Global default treatment timing (used when a session has no podcast). */
 function getRunMode(): RunMode {
@@ -177,7 +195,7 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
   }
   await cloud.recognizeSession(sessionId).catch(() => undefined)
   if (mode === 'now') {
-    await ai.processSession(sessionId).catch((err) => console.error('[ai] run-now failed:', err))
+    await runEdit(sessionId).catch((err) => console.error('[ai] run-now failed:', err))
   }
 }
 
@@ -190,7 +208,7 @@ async function runQueue(): Promise<void> {
     for (;;) {
       const next = store.listSessions().find((s) => s.editStatus === 'pending')
       if (!next) break
-      await ai.processSession(next.id).catch((err) => console.error('[queue] job failed:', err))
+      await runEdit(next.id).catch((err) => console.error('[queue] job failed:', err))
     }
   } finally {
     queueRunning = false
@@ -210,7 +228,7 @@ async function nightlyTick(): Promise<void> {
   if (!pending) return
   nightlyRunning = true
   try {
-    await ai.processSession(pending.id)
+    await runEdit(pending.id)
   } catch (err) {
     console.error('[ai] nightly job failed:', err)
   } finally {
@@ -460,7 +478,7 @@ function registerIpc(): void {
       }
       store.saveSession(session)
       if (mode === 'now') {
-        void ai.processSession(session.id).catch((err) => console.error('[ai] import run failed:', err))
+        void runEdit(session.id).catch((err) => console.error('[ai] import run failed:', err))
       }
       return session
     },
@@ -477,6 +495,23 @@ function registerIpc(): void {
   ipcMain.handle('cloud:list-sessions', () => cloud.listSessions())
   ipcMain.handle('cloud:recognize-session', (_e, id: string) => cloud.recognizeSession(id))
   ipcMain.handle('cloud:upload-session', (_e, id: string) => cloud.uploadSession(id))
+  ipcMain.handle('cloud:get-auto-upload', () => autoUploadEnabled())
+  ipcMain.handle('cloud:set-auto-upload', (_e, on: boolean) =>
+    store.setSetting(AUTO_UPLOAD_KEY, on ? 'true' : 'false'),
+  )
+  ipcMain.handle('cloud:upload-all', async () => {
+    const pending = store.listSessions().filter((s) => !s.uploaded)
+    let uploaded = 0
+    for (const s of pending) {
+      try {
+        await cloud.uploadSession(s.id)
+        uploaded++
+      } catch (err) {
+        console.error('[upload] upload-all item failed:', err)
+      }
+    }
+    return { uploaded, total: pending.length }
+  })
 
   // Shared knowledge base
   ipcMain.handle('kb:get', () => store.getKb())
@@ -519,7 +554,7 @@ function registerIpc(): void {
   ipcMain.handle('backend:list-members', () => backend.listMembers())
 
   // AI editing agents
-  ipcMain.handle('ai:process-session', (_e, id: string) => ai.processSession(id))
+  ipcMain.handle('ai:process-session', (_e, id: string) => runEdit(id))
   ipcMain.handle('ai:get-run-mode', () => getRunMode())
   ipcMain.handle('ai:set-run-mode', (_e, mode: RunMode) => store.setSetting(RUN_MODE_KEY, mode))
   ipcMain.handle('ai:has-key', () => ai.hasAnthropicKey())

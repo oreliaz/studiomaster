@@ -35,6 +35,7 @@ export function CloudView(): JSX.Element {
   const [openReview, setOpenReview] = useState<string | null>(null)
   const [keySet, setKeySet] = useState(false)
   const [keyInput, setKeyInput] = useState('')
+  const [autoUpload, setAutoUpload] = useState(true)
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
@@ -42,6 +43,7 @@ export function CloudView(): JSX.Element {
     setSessions(await window.studiomaster.cloud.listSessions())
     setRunMode(await window.studiomaster.ai.getRunMode())
     setKeySet(await window.studiomaster.ai.hasKey())
+    setAutoUpload(await window.studiomaster.cloud.getAutoUpload())
     if (s.connected) setEvents(await window.studiomaster.cloud.listTodayEvents())
   }
 
@@ -109,6 +111,20 @@ export function CloudView(): JSX.Element {
     await window.studiomaster.ai.processQueue()
     await refresh()
   }
+  const toggleAutoUpload = async (on: boolean): Promise<void> => {
+    setAutoUpload(on)
+    await window.studiomaster.cloud.setAutoUpload(on)
+  }
+  const uploadAll = async (): Promise<void> => {
+    setBusy(true)
+    try {
+      const r = await window.studiomaster.cloud.uploadAll()
+      alert(t('upload.allDone').replace('{uploaded}', String(r.uploaded)).replace('{total}', String(r.total)))
+      await refresh()
+    } finally {
+      setBusy(false)
+    }
+  }
   const openFolder = async (id: string): Promise<void> => {
     const err = await window.studiomaster.sessions.openFolder(id)
     if (err) alert(`לא ניתן לפתוח את התיקייה: ${err}`)
@@ -163,6 +179,23 @@ export function CloudView(): JSX.Element {
             <option value="now">{t('runmode.now')}</option>
             <option value="nightly">{t('runmode.nightly')}</option>
           </select>
+        </div>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={autoUpload}
+            onChange={(e) => toggleAutoUpload(e.target.checked)}
+          />
+          {t('upload.auto')}
+        </label>
+        <div className="actions">
+          <button
+            className="btn btn--small"
+            onClick={uploadAll}
+            disabled={busy || !status.connected}
+          >
+            {t('upload.all')}
+          </button>
         </div>
       </section>
 
