@@ -1,5 +1,6 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import { exec } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { createConnection } from 'node:net'
 import { dirname } from 'node:path'
 import { promisify } from 'node:util'
@@ -150,19 +151,45 @@ function performanceNow(): number {
 export const defaultEffects: LauncherEffects = {
   spawn(program: Program): Promise<void> {
     return new Promise((resolve, reject) => {
-      // Some Windows apps (notably OBS) resolve their data files relative to the
-      // current working directory, and fail hard when launched with an arbitrary
-      // one — OBS aborts with "Failed to find locale/en-US.ini". Launch every
-      // program with its own folder as the working directory, exactly as a
-      // Start-Menu shortcut would ("Start in": the executable's directory).
+      const workdir = dirname(program.path)
+      // A real path that doesn't exist is a clear error — not a fake success.
+      // (Bare command names, no slash, are left for the OS/PATH to resolve.)
+      if (/[\\/]/.test(program.path) && !existsSync(program.path)) {
+        reject(new Error(`הקובץ לא נמצא: ${program.path}`))
+        return
+      }
+
+      if (process.platform === 'win32') {
+        // Node's direct spawn is unreliable for Windows GUI apps and cannot run
+        // .lnk shortcuts at all ("spawn UNKNOWN"). Launch through the shell's
+        // `start`, exactly as Explorer would: it resolves .lnk/.exe, sets the
+        // working directory (/D) so OBS finds its data files, and detaches.
+        const q = (s: string): string => `"${String(s).replace(/"/g, '')}"`
+        const line =
+          `start "" /D ${q(workdir)} ${q(program.path)} ` +
+          (program.args ?? []).map(q).join(' ')
+        const child = nodeSpawn('cmd.exe', ['/c', line], {
+          windowsHide: true,
+          windowsVerbatimArguments: true,
+          stdio: 'ignore',
+        })
+        child.once('error', (err) => reject(err))
+        child.once('spawn', () => {
+          child.unref()
+          resolve()
+        })
+        return
+      }
+
+      // Some apps (notably OBS) resolve data files relative to the working
+      // directory, so launch with the executable's own folder as cwd.
       const child = nodeSpawn(program.path, program.args ?? [], {
-        cwd: dirname(program.path),
+        cwd: workdir,
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
       })
       child.once('error', (err) => reject(err))
-      // 'spawn' fires once the process is successfully created.
       child.once('spawn', () => {
         child.unref()
         resolve()
