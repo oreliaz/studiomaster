@@ -230,6 +230,7 @@ function summarize(summary: Record<string, unknown> | undefined): string {
   const thumb = summary['thumbnail'] as { count?: number } | null
   if (thumb?.count) parts.push(`${thumb.count} תמבנייל`)
   if (summary['brief']) parts.push('מסמך עריכה ✓')
+  if (summary['ai_note']) parts.push(`⚠ ${String(summary['ai_note'])}`)
   if (summary['error']) parts.push(`שגיאה: ${summary['error']}`)
   return parts.join(' · ')
 }

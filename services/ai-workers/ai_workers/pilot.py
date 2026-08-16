@@ -408,6 +408,17 @@ def process(session_dir: Path, dry_run: bool) -> dict:
         emit("error", 1.0, "קובץ ההקלטה לא נמצא")
         return result
 
+    # Surface the common "key set but anthropic package missing" gap so the app
+    # can tell the user why smart selection / title+description didn't run.
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            import anthropic  # type: ignore  # noqa: F401
+        except Exception:  # noqa: BLE001
+            result["ai_note"] = (
+                "מפתח Claude מוגדר אך חבילת anthropic חסרה — "
+                "הרץ: python -m pip install anthropic"
+            )
+
     emit("start", 0.02, "מכין קלט לעריכה")
     # Allocate the progress bar across the enabled stages, weighted by cost.
     weights = {"basic": 3.0, "reels": 4.0, "metadata": 1.0, "thumbnail": 1.0}
