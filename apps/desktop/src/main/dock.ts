@@ -85,15 +85,18 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 </div>
 <div class="count" id="count"></div>
 <script>
-var marks=0;
+var marks=0,base=0,baseAt=0,active=false;
+function p(n,l){return String(n).padStart(l,'0')}
+function fmt(ms){ms=Math.max(0,Math.floor(ms));return p(Math.floor(ms/3600000),2)+':'+p(Math.floor(ms%3600000/60000),2)+':'+p(Math.floor(ms%60000/1000),2)+'.'+p(Math.floor(ms%1000),3)}
 async function refresh(){try{const s=await (await fetch('/api/state')).json();
 document.getElementById('conn').textContent=s.connection.status==='connected'?'מחובר ל-OBS':'מנותק';
-const r=s.record;document.getElementById('tc').textContent=r.timecode;
-const rec=document.getElementById('rec');rec.textContent=r.active?'■ עצור הקלטה':'● התחל הקלטה';rec.className='rec'+(r.active?' on':'');
-document.getElementById('dot').className='dot'+(r.active?' live':'')}catch(e){}}
-async function toggle(){await fetch('/api/record/toggle',{method:'POST'});refresh()}
+const r=s.record;active=!!r.active;base=r.timecodeMs||0;baseAt=performance.now();
+const rec=document.getElementById('rec');rec.textContent=active?'■ עצור הקלטה':'● התחל הקלטה';rec.className='rec'+(active?' on':'');
+document.getElementById('dot').className='dot'+(active?' live':'')}catch(e){}}
+function tick(){var ms=active?base+(performance.now()-baseAt):base;document.getElementById('tc').textContent=fmt(ms)}
+async function toggle(){await fetch('/api/record/toggle',{method:'POST'});setTimeout(refresh,200)}
 async function mark(c){const b=document.getElementById('markfix');b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');
 const res=await (await fetch('/api/marker?cat='+c,{method:'POST'})).json();
 if(res&&res.ok){marks++;document.getElementById('count').textContent='סימונים בהקלטה: '+marks;}}
-setInterval(refresh,500);refresh();
+setInterval(refresh,1000);setInterval(tick,100);refresh();
 </script></body></html>`
