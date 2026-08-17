@@ -15,10 +15,10 @@ import {
 import { t } from '../i18n.js'
 
 const CAT_LABEL: Record<ReviewMarker['category'], string> = {
-  fix: 'תיקון',
-  highlight: 'הדגשה',
-  chapter: 'פרק',
-  note: 'הערה',
+  fix: 'live.catFix',
+  highlight: 'live.catHighlight',
+  chapter: 'live.catChapter',
+  note: 'live.catNote',
 }
 
 export function CloudView(): JSX.Element {
@@ -102,7 +102,7 @@ export function CloudView(): JSX.Element {
     try {
       await window.studiomaster.cloud.uploadSession(id)
     } catch (err) {
-      alert(`העלאה נכשלה: ${err instanceof Error ? err.message : String(err)}`)
+      alert(`${t('cloud.uploadFailed')}: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setBusy(false)
     }
@@ -127,7 +127,7 @@ export function CloudView(): JSX.Element {
   }
   const openFolder = async (id: string): Promise<void> => {
     const err = await window.studiomaster.sessions.openFolder(id)
-    if (err) alert(`לא ניתן לפתוח את התיקייה: ${err}`)
+    if (err) alert(`${t('cloud.folderFailed')}: ${err}`)
   }
   const editWithAi = async (id: string): Promise<void> => {
     setAiBusy(id)
@@ -145,7 +145,7 @@ export function CloudView(): JSX.Element {
       <header className="view__header">
         <h1>{t('cloud.title')}</h1>
         <span className={`badge ${status.connected ? 'badge--connected' : ''}`}>
-          {status.connected ? `מחובר · ${status.email ?? ''}` : 'לא מחובר'}
+          {status.connected ? `${t('dash.stConnected')} · ${status.email ?? ''}` : t('cloud.notConnected')}
         </span>
       </header>
 
@@ -200,13 +200,10 @@ export function CloudView(): JSX.Element {
       </section>
 
       <section className="card">
-        <h2>חשבון Google</h2>
+        <h2>{t('cloud.googleAccount')}</h2>
         {!status.configured && (
           <>
-            <p className="hint">
-              הזן Client ID ו-Client Secret מסוג "Desktop app" מ-Google Cloud Console. Scopes: Drive
-              (drive.file) ו-Calendar (קריאה בלבד).
-            </p>
+            <p className="hint">{t('cloud.googleHint')}</p>
             <div className="field">
               <label>Client ID</label>
               <input value={clientId} onChange={(e) => setClientId(e.target.value)} />
@@ -220,7 +217,7 @@ export function CloudView(): JSX.Element {
               />
             </div>
             <button className="btn" onClick={saveCreds} disabled={!clientId || !clientSecret}>
-              שמור פרטים
+              {t('cloud.saveCreds')}
             </button>
           </>
         )}
@@ -228,11 +225,11 @@ export function CloudView(): JSX.Element {
           <div className="actions">
             {status.connected ? (
               <button className="btn" onClick={disconnect}>
-                נתק
+                {t('common.disconnect')}
               </button>
             ) : (
               <button className="btn btn--primary" onClick={connect} disabled={busy}>
-                {busy ? 'מתחבר…' : 'התחבר ל-Google'}
+                {busy ? t('dash.stConnecting') : t('cloud.connectGoogle')}
               </button>
             )}
           </div>
@@ -243,19 +240,19 @@ export function CloudView(): JSX.Element {
       {status.connected && (
         <section className="card">
           <div className="card__head">
-            <h2>אירועי היום (Calendar)</h2>
+            <h2>{t('cloud.todayEvents')}</h2>
             <button className="btn btn--small" onClick={refresh}>
-              רענן
+              {t('common.refresh')}
             </button>
           </div>
-          {events.length === 0 && <p className="hint">אין אירועים היום.</p>}
+          {events.length === 0 && <p className="hint">{t('cloud.noEvents')}</p>}
           <ul className="event-list">
             {events.map((ev) => (
               <li key={ev.id}>
                 <span className="event-list__time">{formatTime(ev.start)}</span>
                 <span className="event-list__title">{ev.title}</span>
                 {ev.attendees.length > 0 && (
-                  <span className="event-list__guests">{ev.attendees.length} משתתפים</span>
+                  <span className="event-list__guests">{ev.attendees.length} {t('cloud.attendees')}</span>
                 )}
               </li>
             ))}
@@ -267,15 +264,15 @@ export function CloudView(): JSX.Element {
         <h2>{t('queue.title')}</h2>
         <ImportEpisode onImported={refresh} />
         <QueueBar sessions={sessions} onRunAll={runQueue} />
-        {sessions.length === 0 && <p className="hint">אין הקלטות עדיין.</p>}
+        {sessions.length === 0 && <p className="hint">{t('cloud.noSessions')}</p>}
         <ul className="session-list">
           {sessions.map((s) => (
             <li key={s.id} className="session">
               <div className="session__info">
-                <span className="session__title">{s.title ?? 'הקלטה'}</span>
+                <span className="session__title">{s.title ?? t('cloud.recording')}</span>
                 <span className="session__meta">{formatDateTime(s.startedAt)}</span>
                 {s.guests.length > 0 && (
-                  <span className="session__meta">אורחים: {s.guests.join(', ')}</span>
+                  <span className="session__meta">{t('cloud.guests')}: {s.guests.join(', ')}</span>
                 )}
                 <EditStatusLine status={s.editStatus} summary={s.editSummary} />
                 <AiProgressBar progress={aiProgress[s.id]} active={s.editStatus === 'running'} />
@@ -300,12 +297,12 @@ export function CloudView(): JSX.Element {
                     : t('edit.run')}
                 </button>
                 {s.uploaded ? (
-                  <span className="badge badge--connected">הועלה ✓</span>
+                  <span className="badge badge--connected">{t('cloud.uploaded')}</span>
                 ) : (
                   <>
                     {status.connected && (
                       <button className="btn btn--small" onClick={() => recognize(s.id)}>
-                        זהה
+                        {t('cloud.recognize')}
                       </button>
                     )}
                     <button
@@ -313,7 +310,7 @@ export function CloudView(): JSX.Element {
                       onClick={() => upload(s.id)}
                       disabled={busy || !status.connected}
                     >
-                      העלה ל-Drive
+                      {t('cloud.uploadDrive')}
                     </button>
                   </>
                 )}
@@ -323,8 +320,8 @@ export function CloudView(): JSX.Element {
         </ul>
         {progress && progress.state !== 'done' && (
           <p className="hint">
-            מעלה {progress.file} ({progress.fileIndex}/{progress.fileCount})
-            {progress.state === 'error' ? ` — שגיאה: ${progress.error}` : '…'}
+            {t('cloud.uploading')} {progress.file} ({progress.fileIndex}/{progress.fileCount})
+            {progress.state === 'error' ? ` — ${t('dash.stError')}: ${progress.error}` : '…'}
           </p>
         )}
       </section>
@@ -576,7 +573,7 @@ function SessionReview({
               <li key={m.id} className="review__marker">
                 <span className="review__tc">{msToTimecode(m.tcMs)}</span>
                 <span className={`marker-list__cat cat--${m.category}`}>
-                  {CAT_LABEL[m.category]}
+                  {t(CAT_LABEL[m.category])}
                 </span>
                 <input
                   className="review__note"

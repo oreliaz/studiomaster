@@ -6,14 +6,15 @@ import {
   type WizardPhase,
   type WizardState,
 } from '@studiomaster/shared'
+import { t } from '../i18n.js'
 
 const PHASE_LABELS: Record<WizardPhase, string> = {
-  idle: 'ממתין',
-  launching: 'פותח תוכנות…',
-  lighting: 'מכוון תאורה…',
-  checklist: 'בדיקות לפני הקלטה',
-  ready: 'האולפן מוכן',
-  failed: 'הפתיחה נכשלה',
+  idle: 'wizard.phaseIdle',
+  launching: 'wizard.phaseLaunching',
+  lighting: 'wizard.phaseLighting',
+  checklist: 'wizard.phaseChecklist',
+  ready: 'wizard.phaseReady',
+  failed: 'wizard.phaseFailed',
 }
 
 const STEP_ICON: Record<LaunchStep['status'], string> = {
@@ -69,20 +70,20 @@ export function WizardView(): JSX.Element {
   return (
     <>
       <header className="view__header">
-        <h1>פתיחת אולפן</h1>
-        <span className={`badge badge--phase-${state.phase}`}>{PHASE_LABELS[state.phase]}</span>
+        <h1>{t('nav.wizard')}</h1>
+        <span className={`badge badge--phase-${state.phase}`}>{t(PHASE_LABELS[state.phase])}</span>
       </header>
 
       <section className="card">
         <div className="field">
-          <label htmlFor="wprofile">בחר אולפן</label>
+          <label htmlFor="wprofile">{t('wizard.pickStudio')}</label>
           <select
             id="wprofile"
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
             disabled={running || busy}
           >
-            {profiles.length === 0 && <option value="">אין אולפנים — צור אחד תחילה</option>}
+            {profiles.length === 0 && <option value="">{t('wizard.noStudios')}</option>}
             {profiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -96,11 +97,11 @@ export function WizardView(): JSX.Element {
             onClick={start}
             disabled={!selectedId || running || busy}
           >
-            ▶ התחל אולפן
+            {t('wizard.start')}
           </button>
           {(state.phase === 'ready' || state.phase === 'failed') && (
             <button className="btn" onClick={reset}>
-              איפוס
+              {t('wizard.reset')}
             </button>
           )}
         </div>
@@ -108,7 +109,7 @@ export function WizardView(): JSX.Element {
 
       {state.steps.length > 0 && (
         <section className="card">
-          <h2>רצף פתיחה</h2>
+          <h2>{t('wizard.sequence')}</h2>
           <ul className="steps">
             {state.steps.map((step) => (
               <li key={step.id} className={`step step--${step.status}`}>
@@ -117,7 +118,7 @@ export function WizardView(): JSX.Element {
                 </span>
                 <span className="step__label">
                   {step.label}
-                  {step.required && <span className="step__req"> · חיוני</span>}
+                  {step.required && <span className="step__req"> · {t('wizard.required')}</span>}
                 </span>
                 {step.detail && <span className="step__detail">{step.detail}</span>}
               </li>
@@ -128,7 +129,7 @@ export function WizardView(): JSX.Element {
 
       {state.phase === 'checklist' && (
         <section className="card">
-          <h2>בדיקות לפני הקלטה</h2>
+          <h2>{t('wizard.phaseChecklist')}</h2>
           <ul className="checklist">
             {state.checklist.map((item, i) => (
               <li key={i}>
@@ -145,7 +146,7 @@ export function WizardView(): JSX.Element {
           </ul>
           <div className="actions">
             <button className="btn btn--primary" onClick={finishChecklist} disabled={!allChecked}>
-              הכל מוכן →
+              {t('wizard.allReady')}
             </button>
           </div>
         </section>
@@ -153,16 +154,14 @@ export function WizardView(): JSX.Element {
 
       {state.phase === 'ready' && (
         <section className="card card--success">
-          <h2>✓ האולפן מוכן</h2>
-          <p className="hint">
-            עבור ללשונית "הקלטה" כדי להתחבר ל-OBS ולהתחיל. תאורת ההמתנה כובתה במידת הצורך.
-          </p>
+          <h2>{t('wizard.readyTitle')}</h2>
+          <p className="hint">{t('wizard.readyHint')}</p>
         </section>
       )}
 
       {state.phase === 'failed' && (
         <section className="card card--error">
-          <h2>הפתיחה נכשלה</h2>
+          <h2>{t('wizard.phaseFailed')}</h2>
           <p className="error">{state.error}</p>
         </section>
       )}

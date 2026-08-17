@@ -113,7 +113,7 @@ export function ProfilesView(): JSX.Element {
       setDraft(saved)
       setDirty(false)
     } catch (err) {
-      alert(`שמירה נכשלה: ${err instanceof Error ? err.message : String(err)}`)
+      alert(`${t('common.saveFailed')}: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSaving(false)
     }
@@ -121,7 +121,7 @@ export function ProfilesView(): JSX.Element {
 
   const remove = async (): Promise<void> => {
     if (!draft) return
-    if (!confirm(`למחוק את "${draft.name}"?`)) return
+    if (!confirm(t('common.confirmDelete').replace('{name}', draft.name))) return
     await window.studiomaster.profiles.remove(draft.id)
     await reload()
     setDraft(null)
@@ -130,15 +130,15 @@ export function ProfilesView(): JSX.Element {
   return (
     <>
       <header className="view__header">
-        <h1>אולפנים</h1>
+        <h1>{t('nav.profiles')}</h1>
         <button className="btn btn--primary" onClick={createNew}>
-          + אולפן חדש
+          {t('profiles.newStudio')}
         </button>
       </header>
 
       <div className="split">
         <aside className="list">
-          {profiles.length === 0 && <p className="hint">אין אולפנים עדיין. צור אחד חדש.</p>}
+          {profiles.length === 0 && <p className="hint">{t('profiles.empty')}</p>}
           {profiles.map((p) => (
             <button
               key={p.id}
@@ -146,7 +146,7 @@ export function ProfilesView(): JSX.Element {
               onClick={() => select(p)}
             >
               <span>{p.name}</span>
-              <span className="list__meta">{p.programs.length} תוכנות</span>
+              <span className="list__meta">{p.programs.length} {t('profiles.programsCount')}</span>
             </button>
           ))}
         </aside>
@@ -155,7 +155,7 @@ export function ProfilesView(): JSX.Element {
           <div className="editor">
             <div className="card">
               <div className="field">
-                <label htmlFor="pname">שם האולפן</label>
+                <label htmlFor="pname">{t('backend.studioName')}</label>
                 <input
                   id="pname"
                   value={draft.name}
@@ -166,13 +166,13 @@ export function ProfilesView(): JSX.Element {
 
             <section className="card">
               <div className="card__head">
-                <h2>תוכנות לפתיחה (לפי סדר)</h2>
+                <h2>{t('profiles.programsTitle')}</h2>
                 <button className="btn btn--small" onClick={addProgram}>
-                  + הוסף
+                  {t('common.add')}
                 </button>
               </div>
               {draft.programs.length === 0 && (
-                <p className="hint">הוסף את התוכנות שייפתחו כשמפעילים את האולפן.</p>
+                <p className="hint">{t('profiles.programsHint')}</p>
               )}
               {draft.programs.map((program, i) => (
                 <ProgramRow
@@ -189,27 +189,27 @@ export function ProfilesView(): JSX.Element {
 
             <section className="card">
               <div className="card__head">
-                <h2>בקרת תאורה (FreeStyler)</h2>
+                <h2>{t('profiles.lighting')}</h2>
                 <label className="switch">
                   <input
                     type="checkbox"
                     checked={!!draft.lighting}
                     onChange={(e) => toggleLighting(e.target.checked)}
                   />
-                  <span>{draft.lighting ? 'פעיל' : 'כבוי'}</span>
+                  <span>{draft.lighting ? t('profiles.on') : t('profiles.off')}</span>
                 </label>
               </div>
               {draft.lighting && (
                 <div className="grid2">
                   <div className="field">
-                    <label>כתובת</label>
+                    <label>{t('profiles.host')}</label>
                     <input
                       value={draft.lighting.host}
                       onChange={(e) => patchLighting({ host: e.target.value })}
                     />
                   </div>
                   <div className="field">
-                    <label>פורט</label>
+                    <label>{t('profiles.port')}</label>
                     <input
                       type="number"
                       value={draft.lighting.port}
@@ -217,19 +217,19 @@ export function ProfilesView(): JSX.Element {
                     />
                   </div>
                   <div className="field">
-                    <label>Cue המתנה (standby)</label>
+                    <label>{t('profiles.cueStandby')}</label>
                     <input
                       value={draft.lighting.cues['standby'] ?? ''}
                       onChange={(e) => setCue('standby', e.target.value)}
-                      placeholder="למשל button:1"
+                      placeholder={t('profiles.cueEg1')}
                     />
                   </div>
                   <div className="field">
-                    <label>Cue הקלטה (record)</label>
+                    <label>{t('profiles.cueRecord')}</label>
                     <input
                       value={draft.lighting.cues['record'] ?? ''}
                       onChange={(e) => setCue('record', e.target.value)}
-                      placeholder="למשל button:12"
+                      placeholder={t('profiles.cueEg12')}
                     />
                   </div>
                 </div>
@@ -261,20 +261,20 @@ export function ProfilesView(): JSX.Element {
 
             <section className="card">
               <div className="card__head">
-                <h2>צ'קליסט מודרך</h2>
+                <h2>{t('profiles.checklist')}</h2>
                 <button className="btn btn--small" onClick={addChecklistItem}>
-                  + הוסף
+                  {t('common.add')}
                 </button>
               </div>
               {draft.checklist.length === 0 && (
-                <p className="hint">צעדים ידניים לבדיקה לפני תחילת הקלטה (אופציונלי).</p>
+                <p className="hint">{t('profiles.checklistHint')}</p>
               )}
               {draft.checklist.map((item, i) => (
                 <div className="row" key={i}>
                   <input
                     value={item}
                     onChange={(e) => updateChecklist(i, e.target.value)}
-                    placeholder="למשל: ודא שהמצלמות דולקות"
+                    placeholder={t('profiles.checklistEg')}
                   />
                   <button className="btn btn--icon" onClick={() => removeChecklistItem(i)}>
                     ✕
@@ -285,17 +285,17 @@ export function ProfilesView(): JSX.Element {
 
             <div className="editor__footer">
               <button className="btn btn--primary" onClick={save} disabled={saving || !dirty}>
-                {saving ? 'שומר…' : 'שמור'}
+                {saving ? t('common.saving') : t('kb.save')}
               </button>
               <button className="btn btn--danger" onClick={remove}>
-                מחק
+                {t('kb.delete')}
               </button>
-              {dirty && <span className="hint">יש שינויים שלא נשמרו</span>}
+              {dirty && <span className="hint">{t('common.unsaved')}</span>}
             </div>
           </div>
         ) : (
           <div className="editor editor--empty">
-            <p className="hint">בחר אולפן מהרשימה או צור חדש.</p>
+            <p className="hint">{t('profiles.pick')}</p>
           </div>
         )}
       </div>
@@ -335,7 +335,7 @@ function ProgramRow({
       <div className="program__fields">
         <div className="grid2">
           <div className="field">
-            <label>שם</label>
+            <label>{t('profiles.name')}</label>
             <input
               value={program.name}
               onChange={(e) => onChange({ name: e.target.value })}
@@ -343,7 +343,7 @@ function ProgramRow({
             />
           </div>
           <div className="field">
-            <label>נתיב לקובץ ההרצה</label>
+            <label>{t('profiles.exePath')}</label>
             <input
               value={program.path}
               onChange={(e) => onChange({ path: e.target.value })}
@@ -353,23 +353,23 @@ function ProgramRow({
         </div>
         <div className="grid2">
           <div className="field">
-            <label>מוכן כאשר</label>
+            <label>{t('profiles.readyWhen')}</label>
             <select
               value={wait.type}
               onChange={(e) =>
                 onChange({ waitFor: joinWaitFor(e.target.value as WaitForType, wait.value) })
               }
             >
-              {(Object.keys(WAIT_FOR_LABELS) as WaitForType[]).map((t) => (
-                <option key={t} value={t}>
-                  {WAIT_FOR_LABELS[t]}
+              {(Object.keys(WAIT_FOR_LABELS) as WaitForType[]).map((wf) => (
+                <option key={wf} value={wf}>
+                  {t(WAIT_FOR_LABELS[wf])}
                 </option>
               ))}
             </select>
           </div>
           {needsValue && (
             <div className="field">
-              <label>{wait.type === 'delay' ? 'מ״ש' : wait.type === 'port' ? 'פורט' : 'שם'}</label>
+              <label>{wait.type === 'delay' ? t('profiles.ms') : wait.type === 'port' ? t('profiles.port') : t('profiles.name')}</label>
               <input
                 value={wait.value}
                 onChange={(e) => onChange({ waitFor: joinWaitFor(wait.type, e.target.value) })}
@@ -384,7 +384,7 @@ function ProgramRow({
             checked={program.required}
             onChange={(e) => onChange({ required: e.target.checked })}
           />
-          חיוני (עצור את הרצף אם נכשל)
+          {t('profiles.requiredStop')}
         </label>
       </div>
       <button className="btn btn--icon program__remove" onClick={onRemove}>

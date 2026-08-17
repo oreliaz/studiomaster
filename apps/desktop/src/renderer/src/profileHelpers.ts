@@ -4,11 +4,11 @@ import type { DeliverableTemplate, Podcast, Program, StudioProfile } from '@stud
 export type WaitForType = 'spawn' | 'websocket' | 'delay' | 'port' | 'window'
 
 export const WAIT_FOR_LABELS: Record<WaitForType, string> = {
-  spawn: 'מיד עם הפתיחה',
-  websocket: 'המתן ל-OBS (4455)',
-  delay: 'המתן זמן קבוע',
-  port: 'המתן לפורט',
-  window: 'המתן לחלון/תהליך',
+  spawn: 'profiles.waitSpawn',
+  websocket: 'profiles.waitWs',
+  delay: 'profiles.waitDelay',
+  port: 'profiles.waitPort',
+  window: 'profiles.waitWindow',
 }
 
 export function splitWaitFor(waitFor: Program['waitFor']): { type: WaitForType; value: string } {

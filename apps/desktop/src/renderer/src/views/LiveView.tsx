@@ -9,12 +9,13 @@ import type {
   TiltDir,
 } from '@studiomaster/shared'
 import { msToTimecode } from '@studiomaster/shared'
+import { t } from '../i18n.js'
 
 export function LiveView(): JSX.Element {
   return (
     <>
       <header className="view__header">
-        <h1>אולפן חי</h1>
+        <h1>{t('nav.live')}</h1>
       </header>
       <MixerCard />
       <PtzCard />
@@ -40,7 +41,7 @@ function MixerCard(): JSX.Element {
       setCurrent(s.current)
       setError(null)
     } catch {
-      setError('התחבר ל-OBS (לשונית "הקלטה") כדי לראות את המיקסר.')
+      setError(t('live.mixerNeedObs'))
     }
   }
 
@@ -71,16 +72,16 @@ function MixerCard(): JSX.Element {
   return (
     <section className="card">
       <div className="card__head">
-        <h2>מיקסר</h2>
+        <h2>{t('live.mixer')}</h2>
         <button className="btn btn--small" onClick={refresh}>
-          רענן
+          {t('common.refresh')}
         </button>
       </div>
       {error && <p className="hint">{error}</p>}
 
       {scenes.length > 0 && (
         <div className="field">
-          <label>סצנה פעילה</label>
+          <label>{t('live.activeScene')}</label>
           <select value={current ?? ''} onChange={(e) => setScene(e.target.value)}>
             {scenes.map((s) => (
               <option key={s.name} value={s.name}>
@@ -99,7 +100,7 @@ function MixerCard(): JSX.Element {
               className={`btn btn--small ${input.muted ? 'btn--danger' : ''}`}
               onClick={() => setMute(input.name, !input.muted)}
             >
-              {input.muted ? 'מושתק' : 'פעיל'}
+              {input.muted ? t('live.muted') : t('live.active')}
             </button>
           </div>
           <div className="meter">
@@ -119,7 +120,7 @@ function MixerCard(): JSX.Element {
           <span className="mixer-row__db">{input.volumeDb.toFixed(1)} dB</span>
         </div>
       ))}
-      {inputs.length === 0 && !error && <p className="hint">אין מקורות שמע.</p>}
+      {inputs.length === 0 && !error && <p className="hint">{t('live.noInputs')}</p>}
     </section>
   )
 }
@@ -172,10 +173,8 @@ function PtzCard(): JSX.Element {
   if (cameras.length === 0) {
     return (
       <section className="card">
-        <h2>שליטת מצלמות (PTZ)</h2>
-        <p className="hint">
-          אין מצלמות PTZ בפרופיל הפעיל. הוסף מצלמות VISCA-over-IP בלשונית "אולפנים".
-        </p>
+        <h2>{t('live.ptz')}</h2>
+        <p className="hint">{t('live.noPtz')}</p>
       </section>
     )
   }
@@ -183,7 +182,7 @@ function PtzCard(): JSX.Element {
   return (
     <section className="card">
       <div className="card__head">
-        <h2>שליטת מצלמות (PTZ)</h2>
+        <h2>{t('live.ptz')}</h2>
         <select value={camId} onChange={(e) => setCamId(e.target.value)}>
           {cameras.map((c) => (
             <option key={c.id} value={c.id}>
@@ -209,14 +208,14 @@ function PtzCard(): JSX.Element {
         </div>
         <div className="ptz__zoom">
           <button className="btn" onPointerDown={() => zoom('in')} onPointerUp={() => zoom('stop')}>
-            + זום
+            {t('live.zoomIn')}
           </button>
           <button
             className="btn"
             onPointerDown={() => zoom('out')}
             onPointerUp={() => zoom('stop')}
           >
-            − זום
+            {t('live.zoomOut')}
           </button>
         </div>
       </div>
@@ -225,9 +224,9 @@ function PtzCard(): JSX.Element {
         {[1, 2, 3, 4, 5, 6].map((n) => (
           <div className="preset" key={n}>
             <button className="btn btn--small" onClick={() => preset(n, false)}>
-              פריסט {n}
+              {t('live.preset')} {n}
             </button>
-            <button className="btn btn--icon" title="שמור מיקום" onClick={() => preset(n, true)}>
+            <button className="btn btn--icon" title={t('live.savePosition')} onClick={() => preset(n, true)}>
               ●
             </button>
           </div>
@@ -240,17 +239,17 @@ function PtzCard(): JSX.Element {
 // ─── Review markers ──────────────────────────────────────────────────────────
 
 const CATEGORIES: { id: ReviewMarkerCategory; label: string; hotkey: string }[] = [
-  { id: 'fix', label: 'תיקון', hotkey: 'Ctrl+Shift+1' },
-  { id: 'highlight', label: 'הדגשה', hotkey: 'Ctrl+Shift+2' },
-  { id: 'chapter', label: 'פרק', hotkey: 'Ctrl+Shift+3' },
-  { id: 'note', label: 'הערה', hotkey: 'Ctrl+Shift+4' },
+  { id: 'fix', label: 'live.catFix', hotkey: 'Ctrl+Shift+1' },
+  { id: 'highlight', label: 'live.catHighlight', hotkey: 'Ctrl+Shift+2' },
+  { id: 'chapter', label: 'live.catChapter', hotkey: 'Ctrl+Shift+3' },
+  { id: 'note', label: 'live.catNote', hotkey: 'Ctrl+Shift+4' },
 ]
 
 const CAT_LABEL: Record<ReviewMarkerCategory, string> = {
-  fix: 'תיקון',
-  highlight: 'הדגשה',
-  chapter: 'פרק',
-  note: 'הערה',
+  fix: 'live.catFix',
+  highlight: 'live.catHighlight',
+  chapter: 'live.catChapter',
+  note: 'live.catNote',
 }
 
 function MarkersCard(): JSX.Element {
@@ -270,7 +269,7 @@ function MarkersCard(): JSX.Element {
   const add = async (category: ReviewMarkerCategory): Promise<void> => {
     const marker = await window.studiomaster.markers.add(category, note || undefined)
     if (!marker) {
-      alert('אין הקלטה פעילה — התחל הקלטה כדי לסמן טיימקודים.')
+      alert(t('live.noActiveRec'))
       return
     }
     setNote('')
@@ -278,22 +277,19 @@ function MarkersCard(): JSX.Element {
 
   return (
     <section className={`card ${flash ? 'card--flash' : ''}`}>
-      <h2>סימון תיקונים (Hotkey)</h2>
-      <p className="hint">
-        כל לחיצה מוסיפה טיימקוד למסמך התיקונים ומציגה חיווי על מסך ה-OBS (מקור בשם "
-        {'StudioMaster Marker'}").
-      </p>
+      <h2>{t('live.markTitle')}</h2>
+      <p className="hint">{t('live.markHint')}</p>
       <div className="field">
         <input
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="הערה לסימון (אופציונלי)"
+          placeholder={t('live.markNotePlaceholder')}
         />
       </div>
       <div className="marker-buttons">
         {CATEGORIES.map((c) => (
           <button key={c.id} className="btn" onClick={() => add(c.id)}>
-            {c.label}
+            {t(c.label)}
             <span className="marker-buttons__hk">{c.hotkey}</span>
           </button>
         ))}
@@ -303,11 +299,11 @@ function MarkersCard(): JSX.Element {
         {markers.map((m) => (
           <li key={m.id}>
             <span className="marker-list__tc">{msToTimecode(m.tcMs)}</span>
-            <span className={`marker-list__cat cat--${m.category}`}>{CAT_LABEL[m.category]}</span>
+            <span className={`marker-list__cat cat--${m.category}`}>{t(CAT_LABEL[m.category])}</span>
             <span className="marker-list__note">{m.note}</span>
           </li>
         ))}
-        {markers.length === 0 && <li className="hint">עדיין אין סימונים בהקלטה הנוכחית.</li>}
+        {markers.length === 0 && <li className="hint">{t('live.noMarkers')}</li>}
       </ul>
     </section>
   )

@@ -51,14 +51,14 @@ export function PodcastsView(): JSX.Element {
       setDraft(saved)
       setDirty(false)
     } catch (err) {
-      alert(`שמירה נכשלה: ${err instanceof Error ? err.message : String(err)}`)
+      alert(`${t('common.saveFailed')}: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setSaving(false)
     }
   }
   const remove = async (): Promise<void> => {
     if (!draft) return
-    if (!confirm(`למחוק את "${draft.name}"?`)) return
+    if (!confirm(t('common.confirmDelete').replace('{name}', draft.name))) return
     await window.studiomaster.podcasts.remove(draft.id)
     await reload()
     setDraft(null)
@@ -235,12 +235,12 @@ export function PodcastsView(): JSX.Element {
 
             <div className="editor__footer">
               <button className="btn btn--primary" onClick={save} disabled={saving || !dirty}>
-                {saving ? 'שומר…' : 'שמור'}
+                {saving ? t('common.saving') : t('kb.save')}
               </button>
               <button className="btn btn--danger" onClick={remove}>
-                מחק
+                {t('kb.delete')}
               </button>
-              {dirty && <span className="hint">יש שינויים שלא נשמרו</span>}
+              {dirty && <span className="hint">{t('common.unsaved')}</span>}
             </div>
           </div>
         ) : (

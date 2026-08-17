@@ -10,10 +10,10 @@ import { t } from '../i18n.js'
 const DEFAULT_URL = 'ws://127.0.0.1:4455'
 
 const CONNECTION_LABELS: Record<ObsConnectionState['status'], string> = {
-  disconnected: 'מנותק',
-  connecting: 'מתחבר…',
-  connected: 'מחובר',
-  error: 'שגיאה',
+  disconnected: 'dash.stDisconnected',
+  connecting: 'dash.stConnecting',
+  connected: 'dash.stConnected',
+  error: 'dash.stError',
 }
 
 export function DashboardView(): JSX.Element {
@@ -105,17 +105,17 @@ export function DashboardView(): JSX.Element {
   return (
     <>
       <header className="view__header">
-        <h1>הקלטה</h1>
+        <h1>{t('nav.dashboard')}</h1>
         <span className={`badge badge--${connection.status}`}>
-          {CONNECTION_LABELS[connection.status]}
+          {t(CONNECTION_LABELS[connection.status])}
           {connection.obsVersion ? ` · obs-websocket ${connection.obsVersion}` : ''}
         </span>
       </header>
 
       <section className="card">
-        <h2>חיבור ל-OBS</h2>
+        <h2>{t('dash.obsConnect')}</h2>
         <div className="field">
-          <label htmlFor="url">כתובת obs-websocket</label>
+          <label htmlFor="url">{t('dash.obsUrl')}</label>
           <input
             id="url"
             value={url}
@@ -125,24 +125,24 @@ export function DashboardView(): JSX.Element {
           />
         </div>
         <div className="field">
-          <label htmlFor="password">סיסמה</label>
+          <label htmlFor="password">{t('backend.password')}</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={connected || busy}
-            placeholder="(אם מוגדרת ב-OBS)"
+            placeholder={t('dash.passwordPlaceholder')}
           />
         </div>
         <div className="actions">
           {connected ? (
             <button className="btn" onClick={handleDisconnect} disabled={busy}>
-              נתק
+              {t('common.disconnect')}
             </button>
           ) : (
             <button className="btn btn--primary" onClick={handleConnect} disabled={busy}>
-              התחבר
+              {t('dash.connect')}
             </button>
           )}
         </div>
@@ -152,7 +152,7 @@ export function DashboardView(): JSX.Element {
       </section>
 
       <section className="card">
-        <h2>הקלטה</h2>
+        <h2>{t('nav.dashboard')}</h2>
         <div className="field">
           <label htmlFor="podcast">{t('record.podcast')}</label>
           {podcasts.length > 0 ? (
@@ -179,13 +179,13 @@ export function DashboardView(): JSX.Element {
             onClick={handleToggleRecord}
             disabled={!connected || busy}
           >
-            {record.active ? '■ עצור הקלטה' : '● התחל הקלטה'}
+            {record.active ? t('dash.stopRec') : t('dash.startRec')}
           </button>
         </div>
         {record.outputPath ? (
-          <p className="hint">הקובץ האחרון: {record.outputPath}</p>
+          <p className="hint">{t('dash.lastFile')}: {record.outputPath}</p>
         ) : (
-          <p className="hint">התחבר ל-OBS כדי לשלוט בהקלטה.</p>
+          <p className="hint">{t('dash.connectHint')}</p>
         )}
         <div className="actions">
           <button className="btn btn--small" onClick={handleConfigureAudio} disabled={!connected || busy}>
