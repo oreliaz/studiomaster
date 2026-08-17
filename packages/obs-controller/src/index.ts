@@ -47,6 +47,8 @@ export class ObsController extends EventEmitter {
   }
   private params: ObsConnectionParams | null = null
   private reconnectTimer: NodeJS.Timeout | null = null
+  private pollTimer: NodeJS.Timeout | null = null
+  private lastManualStopAt = 0
   private manualDisconnect = false
 
   constructor() {
@@ -84,6 +86,7 @@ export class ObsController extends EventEmitter {
         obsVersion: obsWebSocketVersion,
       })
       await this.refreshRecordState()
+      this.startPolling()
       return this.connection
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
@@ -96,10 +99,46 @@ export class ObsController extends EventEmitter {
   async disconnect(): Promise<void> {
     this.manualDisconnect = true
     this.clearReconnect()
+    this.stopPolling()
     try {
       await this.obs.disconnect()
     } finally {
       this.setConnection({ status: 'disconnected' })
+    }
+  }
+
+  /**
+   * Poll GetRecordStatus while connected so the StudioMaster timecode always
+   * tracks OBS's recording time (markers use it), and recording started/stopped
+   * directly in OBS is detected. `active` from the poll is ignored for a short
+   * window after a manual stop so the record button never sticks during OBS's
+   * stop-flush phase.
+   */
+  private startPolling(): void {
+    if (this.pollTimer) return
+    this.pollTimer = setInterval(() => {
+      if (this.connection.status !== 'connected') return
+      void this.obs
+        .call('GetRecordStatus')
+        .then((status) => {
+          const withinStopGuard = Date.now() - this.lastManualStopAt < 2500
+          const active = withinStopGuard ? this.record.active : status.outputActive
+          this.setRecord({
+            active,
+            paused: status.outputPaused,
+            timecode: status.outputTimecode,
+            timecodeMs: timecodeToMs(status.outputTimecode),
+            outputPath: this.record.outputPath,
+          })
+        })
+        .catch(() => undefined)
+    }, 1000)
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
     }
   }
 
@@ -114,7 +153,8 @@ export class ObsController extends EventEmitter {
   async stopRecord(): Promise<ObsRecordState> {
     const { outputPath } = await this.obs.call('StopRecord')
     // Optimistic: during the stop-flush phase GetRecordStatus still reports
-    // active, which would leave the button stuck. Trust the command result.
+    // active, which would leave the button stuck. Guard the poll for a moment.
+    this.lastManualStopAt = Date.now()
     this.setRecord({ ...this.record, active: false, outputPath })
     return this.record
   }
@@ -337,6 +377,7 @@ export class ObsController extends EventEmitter {
     })
 
     this.obs.on('ConnectionClosed', () => {
+      this.stopPolling()
       if (this.manualDisconnect) return
       this.setConnection({ status: 'disconnected', error: 'connection closed' })
       this.scheduleReconnect()

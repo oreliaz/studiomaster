@@ -266,7 +266,15 @@ function addMarker(category: ReviewMarkerCategory, note?: string) {
   // Always flash for feedback, even when not recording, so the button is never dead.
   void flashMarkerOverlay()
   const rec = obs.getRecordState()
-  const marker = session.addMarker(category, rec.timecodeMs, note)
+  // Primary: OBS record timecode. Backup: the local wall-clock offset since the
+  // recording session started — so a marker is never stuck at 0 if OBS's
+  // timecode is briefly unavailable.
+  let tcMs = rec.timecodeMs
+  if ((!tcMs || tcMs <= 0) && session.session) {
+    const elapsed = Date.now() - Date.parse(session.session.startedAt)
+    if (Number.isFinite(elapsed) && elapsed > 0) tcMs = elapsed
+  }
+  const marker = session.addMarker(category, tcMs, note)
   if (!marker) return null
   broadcast(IPC_EVENTS.markerAdded, marker)
   return marker
