@@ -28,6 +28,7 @@ from pathlib import Path
 
 from .brief import build_brief
 from .cuts import markers_to_cuts_txt
+from .cuts_refine import cuts_to_txt, refine_fix_cuts
 from .metadata import fallback_metadata, generate_metadata
 from .models import Marker
 from .reels_plan import propose_specs, spec_to_arg
@@ -98,7 +99,8 @@ def _write_config(work: Path, job: dict) -> None:
     (work / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), "utf-8")
 
 
-def run_basic(work: Path, capture: Path, dry_run: bool, base: float = 0.0, span: float = 1.0) -> dict:
+def run_basic(work: Path, capture: Path, dry_run: bool, base: float = 0.0, span: float = 1.0,
+              markers: list[Marker] | None = None, guidance: str = "") -> dict:
     steps: list[dict] = []
     inner = work / "work"
     inner.mkdir(exist_ok=True)
@@ -119,6 +121,21 @@ def run_basic(work: Path, capture: Path, dry_run: bool, base: float = 0.0, span:
         _run(["python", str(BASIC_SKILL / "scripts" / "transcribe_full.py"),
               str(audio), str(transcript)], env=env)
     )
+
+    # Transcript-aware cut refinement: rewrite cuts.txt so each 'fix' removes the
+    # actual flubbed sentence (read from the transcript), not a fixed window.
+    fixes = [m for m in (markers or []) if m.category == "fix"]
+    tjson = inner / "transcript.json"
+    if fixes and tjson.exists():
+        try:
+            segments = json.loads(tjson.read_text("utf-8")).get("segments", [])
+            ranges = refine_fix_cuts(fixes, segments, guidance)
+            if ranges:
+                (work / "cuts.txt").write_text(cuts_to_txt(ranges), "utf-8")
+                emit("basic-cuts", base + span * 0.55, f"מדייק {len(ranges)} חיתוכים לפי התמלול")
+        except Exception as exc:  # noqa: BLE001
+            print(f"[basic] cut refine skipped: {exc}", flush=True)
+
     emit("basic-plan", base + span * 0.6, "מתכנן חיתוכים לפי הסימונים")
     steps.append(_run(["python", str(BASIC_SKILL / "scripts" / "plan_edits.py"), str(inner)]))
     emit("basic-render", base + span * 0.75, "מרנדר את הפרק הערוך")
@@ -428,13 +445,16 @@ def process(session_dir: Path, dry_run: bool) -> dict:
         if (name == "metadata" and (req["title"] or req["description"])) or req.get(name)
     ]
     total_w = sum(weights[s] for s in stages) or 1.0
+    guidance = " ".join(
+        x for x in (job.get("notes", ""), job.get("podcastGuidelines", "")) if x
+    )
     cursor = 0.02
     for name in stages:
         span = 0.96 * (weights[name] / total_w)
         base = cursor
         cursor += span
         if name == "basic":
-            result["basic"] = run_basic(session_dir, capture, dry_run, base, span)
+            result["basic"] = run_basic(session_dir, capture, dry_run, base, span, markers, guidance)
         elif name == "reels":
             result["reels"] = run_reels(session_dir, capture, job, markers, dry_run, base, span)
         elif name == "metadata":
