@@ -84,8 +84,19 @@ def _probe_duration_ms(media: Path) -> int:
         return 0
 
 
+# How aggressively to remove internal dead air, per podcast:
+#   (deadair_min_sec = shortest silence removed, deadair_keep_sec = breathing room left).
+SILENCE_TIGHTNESS = {
+    "off": (3.0, 0.6),        # only long gaps (the previous default)
+    "light": (2.0, 0.5),
+    "medium": (1.3, 0.4),     # tighten most pauses but keep natural rhythm
+    "aggressive": (0.8, 0.3),  # snappy — removes nearly every pause
+}
+
+
 def _write_config(work: Path, job: dict) -> None:
     d = job.get("deliverables", {})
+    da_min, da_keep = SILENCE_TIGHTNESS.get(d.get("trimSilence", "medium"), SILENCE_TIGHTNESS["medium"])
     config = {
         "source": job.get("capturePath", ""),
         "intro": d.get("intro") or None,
@@ -93,6 +104,8 @@ def _write_config(work: Path, job: dict) -> None:
         "target_lufs": d.get("targetLufs", -16.0),
         "language": d.get("language", "he"),
         "auto_detect": True,
+        "deadair_min_sec": da_min,
+        "deadair_keep_sec": da_keep,
         "notes": job.get("notes", ""),
         "podcast_guidelines": job.get("podcastGuidelines", ""),
     }

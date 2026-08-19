@@ -154,6 +154,22 @@ export function PodcastsView(): JSX.Element {
                       placeholder="C:/assets/outro.mp4"
                     />
                   </div>
+                  <div className="field">
+                    <label>{t('q.trimSilence')}</label>
+                    <select
+                      value={d.trimSilence}
+                      onChange={(e) =>
+                        patchDeliverables({
+                          trimSilence: e.target.value as DeliverableTemplate['trimSilence'],
+                        })
+                      }
+                    >
+                      <option value="off">{t('trim.off')}</option>
+                      <option value="light">{t('trim.light')}</option>
+                      <option value="medium">{t('trim.medium')}</option>
+                      <option value="aggressive">{t('trim.aggressive')}</option>
+                    </select>
+                  </div>
                 </div>
               )}
 

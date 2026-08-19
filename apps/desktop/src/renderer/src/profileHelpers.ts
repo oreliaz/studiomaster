@@ -61,6 +61,7 @@ export function newDeliverables(): DeliverableTemplate {
     reelStyle: 'simple',
     reelMinSec: 40,
     reelMaxSec: 70,
+    trimSilence: 'medium',
     title: false,
     description: false,
     thumbnail: false,

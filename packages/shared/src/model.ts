@@ -83,6 +83,8 @@ export const deliverableTemplateSchema = z.object({
   reelStyle: z.enum(['simple', 'premium']).default('simple'),
   reelMinSec: z.number().int().positive().default(40),
   reelMaxSec: z.number().int().positive().default(70),
+  /** How aggressively to trim internal silence/pauses in the basic edit. */
+  trimSilence: z.enum(['off', 'light', 'medium', 'aggressive']).default('medium'),
   // Metadata deliverables (independent of the edit type above).
   title: z.boolean().default(false),
   description: z.boolean().default(false),
