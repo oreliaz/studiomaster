@@ -67,8 +67,25 @@ def audio_chain(c):
     return ",".join(ch)
 
 
+# Output frame rate (video is forced to this everywhere: vf "fps=30", match_clip).
+FPS = 30.0
+
+
+def _snap_fps(t):
+    """Snap a time to the output frame grid so audio (sample-exact) and video
+    (whole frames) cut at the SAME instants — otherwise each cut adds a small
+    A/V mismatch that accumulates into a growing sound delay."""
+    return round(float(t) * FPS) / FPS
+
+
 def kept_ranges(plan):
-    return [(k["start"], k["end"]) for k in plan["kept"] if k["end"] - k["start"] > 0.05]
+    out = []
+    for k in plan["kept"]:
+        s = _snap_fps(k["start"])
+        e = _snap_fps(k["end"])
+        if e - s > 0.05:
+            out.append((s, e))
+    return out
 
 
 def _ok(path, dur, tol=2.0):
