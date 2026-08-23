@@ -27,7 +27,16 @@ from common import load_json, measure_loudness, ffprobe_json, ffprobe_duration, 
 DEF = {"target_lufs": -16.0, "target_tp": -1.5, "target_lra": 11.0, "highpass_hz": 80,
        "denoise": "afftdn", "dialogue_level": "gentle", "v_bitrate": "10M",
        "preset": "faster", "intro": None, "outro": None, "chunk_sec": 200,
-       "intro_dissolve": True, "dissolve_dur": 0.7}
+       "intro_dissolve": True, "dissolve_dur": 0.7,
+       # ── Per-microphone audio (multitrack recordings) ──────────────────────
+       # OBS multitrack: audio stream 0 = the mixed-down (mixdown) track, streams
+       # 1..N = one microphone each. We DROP the mixdown, keep only microphones
+       # that were actually used, balance them to a common level, and fold each to
+       # mono so every voice is heard equally in both speakers.
+       "per_mic_audio": True,       # set False to force the plain stereo extraction
+       "active_max_db": -40.0,      # a mic is "used" if its peak is louder than this
+       "mic_target_db": -24.0,      # balance each mic's average toward this level
+       "max_mic_gain_db": 15.0}     # never push a single mic by more than this
 
 
 def cfg_get(work):
@@ -97,6 +106,71 @@ def _ok(path, dur, tol=2.0):
         return False  # corrupt/partial file (e.g. killed mid-write) -> re-make it
 
 
+def _audio_stream_count(src):
+    """How many audio streams the source carries (mixdown + per-mic tracks)."""
+    try:
+        info = ffprobe_json(src)
+    except Exception:
+        return 0
+    return sum(1 for s in info.get("streams", []) if s.get("codec_type") == "audio")
+
+
+def _stream_stats(src, ai):
+    """(mean_db, max_db) for audio stream `ai` via ffmpeg volumedetect.
+    Returns (None, None) for a silent/empty channel (mean is -inf)."""
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-vn",
+                        "-i", src, "-map", f"0:a:{ai}", "-af", "volumedetect",
+                        "-f", "null", "-"],
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                       text=True, encoding="utf-8", errors="replace").stdout
+    def grab(label):
+        m = re.search(label + r":\s*(-?[\d.]+) dB", r)
+        return float(m.group(1)) if m else None
+    return grab("mean_volume"), grab("max_volume")
+
+
+def _active_mics(src, c):
+    """Identify which microphone tracks were actually used.
+
+    Returns a list of (stream_index, mean_db) for the active mics, or None to
+    signal "no per-mic layout detected — extract the mixed track as usual".
+    Stream 0 is treated as the mixdown and always skipped when >=2 streams exist.
+    """
+    if not c.get("per_mic_audio", True):
+        return None
+    n = _audio_stream_count(src)
+    if n < 2:
+        return None                      # single track -> nothing to drop/balance
+    active = []
+    for ai in range(1, n):               # skip stream 0 = mixdown
+        mean_db, max_db = _stream_stats(src, ai)
+        if max_db is not None and max_db > c["active_max_db"]:
+            active.append((ai, mean_db if mean_db is not None else -30.0))
+    if not active:
+        return None                      # couldn't tell mics apart -> safe fallback
+    return active
+
+
+def _extract_per_mic(src, raw, mics, c):
+    """Balance the active mics to a common level, fold to mono, and lay that mono
+    signal into BOTH stereo channels (heard equally left+right). Drops the
+    mixdown and every unused track."""
+    parts = []
+    for j, (ai, mean_db) in enumerate(mics):
+        gain = max(-c["max_mic_gain_db"], min(c["max_mic_gain_db"],
+                                              c["mic_target_db"] - mean_db))
+        parts.append(f"[0:a:{ai}]aformat=channel_layouts=mono,"
+                     f"volume={gain:.1f}dB[m{j}]")
+    mix = "".join(f"[m{j}]" for j in range(len(mics)))
+    parts.append(f"{mix}amix=inputs={len(mics)}:normalize=0[mono]")
+    parts.append("[mono]pan=stereo|c0=c0|c1=c0[out]")
+    fc = ";".join(parts)
+    labels = ", ".join(f"a:{ai} ({mean:.0f}dB)" for ai, mean in mics)
+    run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", src,
+         "-filter_complex", fc, "-map", "[out]", "-ar", "48000",
+         "-c:a", "pcm_s16le", raw], f"balance mics -> mono [{labels}]")
+
+
 def build_audio_final(work, c, src, plan):
     """Continuous chain -> cut -> CHUNKED loudnorm+limiter. Resumable at each step.
     loudnorm uses global measured values (constant gain) so per-chunk == single pass."""
@@ -106,8 +180,14 @@ def build_audio_final(work, c, src, plan):
         return out
     raw = os.path.join(work, "aud_raw.wav")
     if not _ok(raw, plan["total_sec"]):
-        run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", src,
-             "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", raw], "extract full audio")
+        mics = _active_mics(src, c)
+        if mics:
+            print(f"[render] per-mic audio: keeping {len(mics)} active mic(s), "
+                  f"dropping mixdown + unused tracks", flush=True)
+            _extract_per_mic(src, raw, mics, c)
+        else:
+            run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-vn", "-i", src,
+                 "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", raw], "extract full audio")
     chained = os.path.join(work, "aud_chain.wav")
     if not _ok(chained, plan["total_sec"]):
         run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", raw,
