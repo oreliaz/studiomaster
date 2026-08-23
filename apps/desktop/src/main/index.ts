@@ -581,6 +581,7 @@ function registerHotkeys(): void {
     'CommandOrControl+Shift+2': 'highlight',
     'CommandOrControl+Shift+3': 'chapter',
     'CommandOrControl+Shift+4': 'note',
+    'CommandOrControl+Shift+5': 'intro',
   }
   for (const [accel, category] of Object.entries(map)) {
     const ok = globalShortcut.register(accel, () => addMarker(category))

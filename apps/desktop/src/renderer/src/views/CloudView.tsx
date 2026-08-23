@@ -19,6 +19,7 @@ const CAT_LABEL: Record<ReviewMarker['category'], string> = {
   highlight: 'live.catHighlight',
   chapter: 'live.catChapter',
   note: 'live.catNote',
+  intro: 'live.catIntro',
 }
 
 export function CloudView(): JSX.Element {

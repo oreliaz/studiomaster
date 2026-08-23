@@ -69,7 +69,12 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
   padding:22px 12px;border-radius:14px;box-shadow:0 4px 14px rgba(239,68,68,.45);
   letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .mark-fix:active{transform:translateY(1px)}
-.mark-fix.flash{animation:flash .5s}
+/* Prominent "insert intro here" cue — the second primary in-OBS action. */
+.mark-intro{background:linear-gradient(180deg,#38bdf8,#0369a1);font-size:20px;font-weight:800;
+  padding:18px 12px;border-radius:14px;box-shadow:0 4px 14px rgba(56,189,248,.4);
+  letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+.mark-intro:active{transform:translateY(1px)}
+.flash{animation:flash .5s}
 @keyframes flash{0%{background:#fff;color:#b91c1c}100%{}}
 .row{display:flex;gap:6px}.row button{background:#222833;font-size:13px;padding:10px}
 .status{font-size:12px;color:#8b93a4;text-align:center;margin-bottom:6px}
@@ -78,14 +83,16 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 <div class="status" id="conn">…</div>
 <div class="tc"><span class="dot" id="dot"></span><span id="tc">00:00:00.000</span></div>
 <button class="rec" id="rec" onclick="toggle()">● התחל הקלטה</button>
-<button class="mark-fix" id="markfix" onclick="mark('fix')">🔴 סמן טעות</button>
+<button class="mark-fix" onclick="mark('fix',this)">🔴 סמן טעות</button>
+<button class="mark-intro" onclick="mark('intro',this)">🎬 כאן נכנס פתיח</button>
 <div class="row">
-<button onclick="mark('highlight')">הדגשה</button>
-<button onclick="mark('chapter')">פרק</button>
+<button onclick="mark('highlight',this)">הדגשה</button>
+<button onclick="mark('chapter',this)">פרק</button>
 </div>
 <div class="count" id="count"></div>
+<div class="count" id="introcount"></div>
 <script>
-var marks=0,base=0,baseAt=0,active=false;
+var marks=0,intros=0,base=0,baseAt=0,active=false;
 function p(n,l){return String(n).padStart(l,'0')}
 function fmt(ms){ms=Math.max(0,Math.floor(ms));return p(Math.floor(ms/3600000),2)+':'+p(Math.floor(ms%3600000/60000),2)+':'+p(Math.floor(ms%60000/1000),2)+'.'+p(Math.floor(ms%1000),3)}
 async function refresh(){try{const s=await (await fetch('/api/state')).json();
@@ -95,8 +102,9 @@ const rec=document.getElementById('rec');rec.textContent=active?'■ עצור ה
 document.getElementById('dot').className='dot'+(active?' live':'')}catch(e){}}
 function tick(){var ms=active?base+(performance.now()-baseAt):base;document.getElementById('tc').textContent=fmt(ms)}
 async function toggle(){await fetch('/api/record/toggle',{method:'POST'});setTimeout(refresh,200)}
-async function mark(c){const b=document.getElementById('markfix');b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');
+async function mark(c,b){if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');}
 const res=await (await fetch('/api/marker?cat='+c,{method:'POST'})).json();
-if(res&&res.ok){marks++;document.getElementById('count').textContent='סימונים בהקלטה: '+marks;}}
+if(res&&res.ok){if(c==='intro'){intros++;document.getElementById('introcount').textContent='נקודות פתיח: '+intros;}
+else{marks++;document.getElementById('count').textContent='סימונים בהקלטה: '+marks;}}}
 setInterval(refresh,1000);setInterval(tick,100);refresh();
 </script></body></html>`

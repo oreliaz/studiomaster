@@ -16,6 +16,7 @@ const CATEGORY_LABELS: Record<ReviewMarkerCategory, string> = {
   highlight: 'הדגשה',
   chapter: 'פרק',
   note: 'הערה',
+  intro: 'פתיח',
 }
 
 export interface RecordingSession {

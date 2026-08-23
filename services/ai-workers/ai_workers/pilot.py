@@ -94,7 +94,7 @@ SILENCE_TIGHTNESS = {
 }
 
 
-def _write_config(work: Path, job: dict) -> None:
+def _write_config(work: Path, job: dict, markers: list[Marker] | None = None) -> None:
     d = job.get("deliverables", {})
     da_min, da_keep = SILENCE_TIGHTNESS.get(d.get("trimSilence", "medium"), SILENCE_TIGHTNESS["medium"])
     config = {
@@ -109,6 +109,12 @@ def _write_config(work: Path, job: dict) -> None:
         "notes": job.get("notes", ""),
         "podcast_guidelines": job.get("podcastGuidelines", ""),
     }
+    # "פתיח" cue: the host said an opening line, then the intro should drop in.
+    # Take the earliest intro marker; render_final inserts the intro there (in the
+    # edited timeline) instead of at the very start.
+    intro_cues = sorted((m.tc_ms for m in (markers or []) if m.category == "intro"))
+    if intro_cues:
+        config["intro_cue_sec"] = intro_cues[0] / 1000.0
     (work / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), "utf-8")
 
 
@@ -411,7 +417,7 @@ def process(session_dir: Path, dry_run: bool) -> dict:
 
     # Prepare skill inputs regardless of which skill runs.
     (session_dir / "cuts.txt").write_text(markers_to_cuts_txt(markers), "utf-8")
-    _write_config(session_dir, job)
+    _write_config(session_dir, job, markers)
 
     capture = Path(job.get("capturePath", ""))
     capture_ok = capture.exists()

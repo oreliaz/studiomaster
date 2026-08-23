@@ -188,7 +188,7 @@ export interface TimelineEvent {
   data?: Record<string, unknown>
 }
 
-export type ReviewMarkerCategory = 'fix' | 'highlight' | 'chapter' | 'note'
+export type ReviewMarkerCategory = 'fix' | 'highlight' | 'chapter' | 'note' | 'intro'
 
 /** A timecode marker dropped by the review hotkey (docs §6.2.2). */
 export interface ReviewMarker {

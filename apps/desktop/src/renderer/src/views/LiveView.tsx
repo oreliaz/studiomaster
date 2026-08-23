@@ -243,6 +243,7 @@ const CATEGORIES: { id: ReviewMarkerCategory; label: string; hotkey: string }[] 
   { id: 'highlight', label: 'live.catHighlight', hotkey: 'Ctrl+Shift+2' },
   { id: 'chapter', label: 'live.catChapter', hotkey: 'Ctrl+Shift+3' },
   { id: 'note', label: 'live.catNote', hotkey: 'Ctrl+Shift+4' },
+  { id: 'intro', label: 'live.catIntro', hotkey: 'Ctrl+Shift+5' },
 ]
 
 const CAT_LABEL: Record<ReviewMarkerCategory, string> = {
@@ -250,6 +251,7 @@ const CAT_LABEL: Record<ReviewMarkerCategory, string> = {
   highlight: 'live.catHighlight',
   chapter: 'live.catChapter',
   note: 'live.catNote',
+  intro: 'live.catIntro',
 }
 
 function MarkersCard(): JSX.Element {

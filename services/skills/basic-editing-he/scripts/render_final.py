@@ -97,6 +97,30 @@ def kept_ranges(plan):
     return out
 
 
+def cue_boundary_body_sec(plan, cue_orig):
+    """Map a "פתיח" cue (original source seconds) to a clean insertion point in the
+    edited body (body seconds).
+
+    The body is the kept ranges concatenated; the joints between them are the
+    real cut points — sentence/silence-aligned by plan_edits and keyframe-aligned
+    in the encoded body. Snapping the intro to the joint nearest to where the host
+    pressed the button makes it drop in seamlessly, cut against the speech, with no
+    stray silence. Returns None when there is no internal joint to use."""
+    ranges = kept_ranges(plan)
+    if len(ranges) < 2:
+        return None
+    acc = 0.0
+    cands = []  # (body_time_at_joint, original_time_at_joint)
+    for i, (s, e) in enumerate(ranges):
+        acc += (e - s)
+        if i < len(ranges) - 1:            # skip the final end — nothing follows it
+            cands.append((acc, e))
+    if not cands:
+        return None
+    body_t, _ = min(cands, key=lambda c: abs(c[1] - float(cue_orig)))
+    return _snap_fps(body_t)
+
+
 def _ok(path, dur, tol=2.0):
     if not os.path.exists(path):
         return False
@@ -346,21 +370,45 @@ def assemble(work, c, body):
         return final
     tmp = tempfile.mkdtemp(prefix="be_")
     seq = []
+
+    # "פתיח" cue: play the opening words first, THEN drop the intro in, THEN the
+    # rest of the episode. Splits the body at the cue joint (a keyframe, so the
+    # stream-copy split is seamless). Falls back to intro-at-start when unset.
+    lead = None
+    main = body
+    cue = c.get("_intro_cue_body")
+    if intro and os.path.exists(intro) and cue and cue > 1.0:
+        bdur = ffprobe_duration(body)
+        split0 = kf_at_or_after(body, cue)
+        if 1.0 < split0 < bdur - 1.0:
+            lead = os.path.join(work, "bodylead.mp4")
+            run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", body,
+                 "-t", f"{split0}", "-c", "copy", "-avoid_negative_ts", "make_zero", lead],
+                f"opening words 0..{fmt_tc(split0)} (before intro)")
+            main = os.path.join(work, "bodymain.mp4")
+            run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{split0}",
+                 "-i", body, "-c", "copy", "-avoid_negative_ts", "make_zero", main],
+                f"episode from {fmt_tc(split0)} (after intro)")
+            print(f"[render] intro cue -> intro inserted at {fmt_tc(split0)}", flush=True)
+
+    if lead:
+        seq.append(lead)
+
     if intro and os.path.exists(intro):
         intro_m = match_clip(intro, c, tmp, "intro.mp4")
         black = detect_trailing_black(intro_m) if c.get("intro_dissolve", True) else None
         if black:
             print(f"[render] intro has black cut @ {fmt_tc(black)} -> music-over dissolve", flush=True)
-            trans, split = build_intro_dissolve(work, c, intro_m, body, black, tmp)
+            trans, split = build_intro_dissolve(work, c, intro_m, main, black, tmp)
             rest = os.path.join(work, "bodyrest.mp4")
             run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{split}",
-                 "-i", body, "-c", "copy", "-avoid_negative_ts", "make_zero", rest],
+                 "-i", main, "-c", "copy", "-avoid_negative_ts", "make_zero", rest],
                 f"body from {fmt_tc(split)} (copy)")
             seq += [trans, rest]
         else:
-            seq += [intro_m, body]
+            seq += [intro_m, main]
     else:
-        seq.append(body)
+        seq.append(main)
     if outro and os.path.exists(outro):
         seq.append(match_clip(outro, c, tmp, "outro.mp4"))
     listf = os.path.join(tmp, "list.txt")
@@ -392,6 +440,16 @@ def main():
     plan = load_json(os.path.join(work, "edit_plan.json"))
     src = c.get("source") or plan["source"]
     print(f"[render] {len(plan['kept'])} kept segments, body ~{fmt_tc(plan['kept_sec'])}", flush=True)
+
+    # Map any "פתיח" cue (original source seconds) to a clean insertion point in the
+    # edited body, so assemble() can drop the intro after the opening words.
+    cue_orig = c.get("intro_cue_sec")
+    if cue_orig is not None:
+        try:
+            c["_intro_cue_body"] = cue_boundary_body_sec(plan, float(cue_orig))
+        except Exception as exc:  # noqa: BLE001
+            print(f"[render] intro cue mapping skipped: {exc}", flush=True)
+            c["_intro_cue_body"] = None
 
     body = os.path.join(work, "body.mp4")
     if os.path.exists(body) and abs(ffprobe_duration(body) - plan["kept_sec"]) < 1.5:
