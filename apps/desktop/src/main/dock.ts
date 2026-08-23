@@ -7,11 +7,18 @@ import type { ObsConnectionState, ObsRecordState, ReviewMarkerCategory } from '@
  * (Docks → Custom Browser Docks → URL http://127.0.0.1:3939/dock). It exposes
  * the essentials — connection/record state, start/stop, and review markers —
  * so StudioMaster lives *inside* OBS without a native C++ plugin.
+ *
+ * The dock follows the app's interface language (he/en); it is rebuilt per
+ * request so switching the language and reloading the dock takes effect.
  */
+export type DockLang = 'he' | 'en'
+
 export interface DockDeps {
   getState(): { connection: ObsConnectionState; record: ObsRecordState }
   toggleRecord(): Promise<ObsRecordState>
   addMarker(category: ReviewMarkerCategory): unknown
+  /** Current UI language, so the dock matches the rest of the app. */
+  getLang?(): DockLang
 }
 
 export const DOCK_PORT = 3939
@@ -22,8 +29,9 @@ export function startDockServer(deps: DockDeps, port = DOCK_PORT): Server {
     res.setHeader('Access-Control-Allow-Origin', '*')
 
     if (url.pathname === '/dock') {
+      const lang = (url.searchParams.get('lang') as DockLang) || deps.getLang?.() || 'he'
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
-      res.end(DOCK_HTML)
+      res.end(dockHtml(lang === 'en' ? 'en' : 'he'))
       return
     }
     if (url.pathname === '/api/state') {
@@ -53,7 +61,51 @@ export function startDockServer(deps: DockDeps, port = DOCK_PORT): Server {
   return server
 }
 
-const DOCK_HTML = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"/>
+interface DockStrings {
+  connected: string
+  disconnected: string
+  start: string
+  stop: string
+  markFix: string
+  markIntro: string
+  highlight: string
+  chapter: string
+  markCount: string
+  introCount: string
+}
+
+const STRINGS: Record<DockLang, DockStrings> = {
+  he: {
+    connected: 'מחובר ל-OBS',
+    disconnected: 'מנותק',
+    start: '● התחל הקלטה',
+    stop: '■ עצור הקלטה',
+    markFix: '🔴 סמן טעות',
+    markIntro: '🎬 כאן נכנס פתיח',
+    highlight: 'הדגשה',
+    chapter: 'פרק',
+    markCount: 'סימונים בהקלטה: ',
+    introCount: 'נקודות פתיח: ',
+  },
+  en: {
+    connected: 'Connected to OBS',
+    disconnected: 'Disconnected',
+    start: '● Start recording',
+    stop: '■ Stop recording',
+    markFix: '🔴 Mark mistake',
+    markIntro: '🎬 Intro goes here',
+    highlight: 'Highlight',
+    chapter: 'Chapter',
+    markCount: 'Markers this recording: ',
+    introCount: 'Intro cues: ',
+  },
+}
+
+function dockHtml(lang: DockLang): string {
+  const s = STRINGS[lang]
+  const dir = lang === 'he' ? 'rtl' : 'ltr'
+  const L = JSON.stringify(s)
+  return `<!doctype html><html dir="${dir}" lang="${lang}"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>StudioMaster</title><style>
 :root{color-scheme:dark}
@@ -82,29 +134,35 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 </style></head><body>
 <div class="status" id="conn">…</div>
 <div class="tc"><span class="dot" id="dot"></span><span id="tc">00:00:00.000</span></div>
-<button class="rec" id="rec" onclick="toggle()">● התחל הקלטה</button>
-<button class="mark-fix" onclick="mark('fix',this)">🔴 סמן טעות</button>
-<button class="mark-intro" onclick="mark('intro',this)">🎬 כאן נכנס פתיח</button>
+<button class="rec" id="rec" onclick="toggle()"></button>
+<button class="mark-fix" onclick="mark('fix',this)"></button>
+<button class="mark-intro" onclick="mark('intro',this)"></button>
 <div class="row">
-<button onclick="mark('highlight',this)">הדגשה</button>
-<button onclick="mark('chapter',this)">פרק</button>
+<button id="bhl" onclick="mark('highlight',this)"></button>
+<button id="bch" onclick="mark('chapter',this)"></button>
 </div>
 <div class="count" id="count"></div>
 <div class="count" id="introcount"></div>
 <script>
+var L=${L};
 var marks=0,intros=0,base=0,baseAt=0,active=false;
+document.querySelector('.mark-fix').textContent=L.markFix;
+document.querySelector('.mark-intro').textContent=L.markIntro;
+document.getElementById('bhl').textContent=L.highlight;
+document.getElementById('bch').textContent=L.chapter;
 function p(n,l){return String(n).padStart(l,'0')}
 function fmt(ms){ms=Math.max(0,Math.floor(ms));return p(Math.floor(ms/3600000),2)+':'+p(Math.floor(ms%3600000/60000),2)+':'+p(Math.floor(ms%60000/1000),2)+'.'+p(Math.floor(ms%1000),3)}
 async function refresh(){try{const s=await (await fetch('/api/state')).json();
-document.getElementById('conn').textContent=s.connection.status==='connected'?'מחובר ל-OBS':'מנותק';
+document.getElementById('conn').textContent=s.connection.status==='connected'?L.connected:L.disconnected;
 const r=s.record;active=!!r.active;base=r.timecodeMs||0;baseAt=performance.now();
-const rec=document.getElementById('rec');rec.textContent=active?'■ עצור הקלטה':'● התחל הקלטה';rec.className='rec'+(active?' on':'');
+const rec=document.getElementById('rec');rec.textContent=active?L.stop:L.start;rec.className='rec'+(active?' on':'');
 document.getElementById('dot').className='dot'+(active?' live':'')}catch(e){}}
 function tick(){var ms=active?base+(performance.now()-baseAt):base;document.getElementById('tc').textContent=fmt(ms)}
 async function toggle(){await fetch('/api/record/toggle',{method:'POST'});setTimeout(refresh,200)}
 async function mark(c,b){if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');}
 const res=await (await fetch('/api/marker?cat='+c,{method:'POST'})).json();
-if(res&&res.ok){if(c==='intro'){intros++;document.getElementById('introcount').textContent='נקודות פתיח: '+intros;}
-else{marks++;document.getElementById('count').textContent='סימונים בהקלטה: '+marks;}}}
+if(res&&res.ok){if(c==='intro'){intros++;document.getElementById('introcount').textContent=L.introCount+intros;}
+else{marks++;document.getElementById('count').textContent=L.markCount+marks;}}}
 setInterval(refresh,1000);setInterval(tick,100);refresh();
 </script></body></html>`
+}

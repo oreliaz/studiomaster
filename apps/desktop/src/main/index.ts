@@ -43,6 +43,7 @@ const ACTIVE_PROFILE_KEY = 'active.profile'
 const ACTIVE_PODCAST_KEY = 'active.podcast'
 const RUN_MODE_KEY = 'run.mode'
 const AUTO_UPLOAD_KEY = 'upload.autoAfterEdit'
+const UI_LANG_KEY = 'ui.lang'
 
 /** Auto-upload to Drive after an edit finishes (default on; no-op if not connected). */
 function autoUploadEnabled(): boolean {
@@ -503,6 +504,10 @@ function registerIpc(): void {
   ipcMain.handle('cloud:list-sessions', () => cloud.listSessions())
   ipcMain.handle('cloud:recognize-session', (_e, id: string) => cloud.recognizeSession(id))
   ipcMain.handle('cloud:upload-session', (_e, id: string) => cloud.uploadSession(id))
+  // Persist the UI language so the OBS dock (main process) matches the app.
+  ipcMain.handle('settings:set-lang', (_e, lang: string) =>
+    store.setSetting(UI_LANG_KEY, lang === 'en' ? 'en' : 'he'),
+  )
   ipcMain.handle('cloud:get-auto-upload', () => autoUploadEnabled())
   ipcMain.handle('cloud:set-auto-upload', (_e, on: boolean) =>
     store.setSetting(AUTO_UPLOAD_KEY, on ? 'true' : 'false'),
@@ -635,6 +640,7 @@ app.whenReady().then(() => {
     getState: () => ({ connection: obs.getConnectionState(), record: obs.getRecordState() }),
     toggleRecord: () => obs.toggleRecord(),
     addMarker: (category) => addMarker(category),
+    getLang: () => (store.getSetting(UI_LANG_KEY) === 'en' ? 'en' : 'he'),
   })
 
   // Nightly editor scheduler — checks every 5 minutes (docs §6.4, transcript).

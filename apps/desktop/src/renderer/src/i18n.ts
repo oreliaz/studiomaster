@@ -477,7 +477,23 @@ export function getLang(): Lang {
 
 export function setLang(lang: Lang): void {
   localStorage.setItem('lang', lang)
-  location.reload()
+  // Mirror the choice to the main process so the OBS dock matches the app.
+  // Reload after it lands (best-effort) so the whole UI re-renders in the new lang.
+  const done = (): void => location.reload()
+  try {
+    void window.studiomaster.settings.setLang(lang).then(done, done)
+  } catch {
+    done()
+  }
+}
+
+/** Push the current UI language to the main process (called once on startup). */
+export function syncLang(): void {
+  try {
+    void window.studiomaster.settings.setLang(getLang())
+  } catch {
+    /* main process not ready / not in Electron — ignore */
+  }
 }
 
 export function isRtl(): boolean {

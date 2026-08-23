@@ -144,6 +144,9 @@ const api: StudioMasterApi = {
     setActiveWorkspace: (id: string) => ipcRenderer.invoke('backend:set-active-workspace', id),
     listMembers: () => ipcRenderer.invoke('backend:list-members'),
   },
+  settings: {
+    setLang: (lang: 'he' | 'en') => ipcRenderer.invoke('settings:set-lang', lang),
+  },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),
   onRecordState: (cb: (state: ObsRecordState) => void) => subscribe(IPC_EVENTS.obsRecord, cb),

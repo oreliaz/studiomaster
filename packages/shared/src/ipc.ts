@@ -162,6 +162,10 @@ export interface StudioMasterApi {
     setActiveWorkspace(id: string): Promise<void>
     listMembers(): Promise<WorkspaceMember[]>
   }
+  settings: {
+    /** Persist the UI language so the OBS dock matches the app. */
+    setLang(lang: 'he' | 'en'): Promise<void>
+  }
   onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void
   onRecordState(cb: (state: ObsRecordState) => void): () => void
