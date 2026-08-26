@@ -594,6 +594,8 @@ function registerHotkeys(): void {
   }
 }
 
+let mainWindow: BrowserWindow | null = null
+
 function createWindow(): void {
   const window = new BrowserWindow({
     width: 1180,
@@ -611,6 +613,10 @@ function createWindow(): void {
     },
   })
 
+  mainWindow = window
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null
+  })
   window.on('ready-to-show', () => window.show())
   window.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url)
@@ -624,7 +630,25 @@ function createWindow(): void {
   }
 }
 
+// Only one StudioMaster may run at a time: a second launch would fight the
+// first for the marker hotkeys, the OBS dock port (3939), and the Electron
+// user-data cache (the EADDRINUSE / "failed to register hotkey" / "Unable to
+// create cache" errors). If we can't get the lock, hand focus to the running
+// window and quit this copy.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+}
+
 app.whenReady().then(() => {
+  if (!app.hasSingleInstanceLock()) return // second instance is quitting
   // Default the active profile to the first one that has cameras, if unset.
   if (!store.getSetting(ACTIVE_PROFILE_KEY)) {
     const withCams = store.listProfiles().find((p) => p.cameras.length > 0)

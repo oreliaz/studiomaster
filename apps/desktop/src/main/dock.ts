@@ -56,7 +56,16 @@ export function startDockServer(deps: DockDeps, port = DOCK_PORT): Server {
     res.statusCode = 404
     res.end('not found')
   })
-  server.on('error', (err) => console.error('[dock] server error:', err))
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(
+        `[dock] port ${port} already in use — another StudioMaster (or app) is ` +
+          `holding it; the OBS dock will use the running instance.`,
+      )
+    } else {
+      console.error('[dock] server error:', err)
+    }
+  })
   server.listen(port, '127.0.0.1')
   return server
 }
