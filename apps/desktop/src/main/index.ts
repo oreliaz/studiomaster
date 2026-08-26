@@ -436,6 +436,8 @@ function registerIpc(): void {
     const existing = store.getSession(sessionId)
     if (!existing) return null
     const updated = { ...existing, ...patch }
+    // An empty podcastId means "no podcast" — store it as unset, not "".
+    if (patch.podcastId !== undefined) updated.podcastId = patch.podcastId || undefined
     store.saveSession(updated)
     return updated
   })

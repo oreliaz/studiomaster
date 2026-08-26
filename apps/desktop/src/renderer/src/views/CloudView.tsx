@@ -28,6 +28,7 @@ export function CloudView(): JSX.Element {
   const [clientSecret, setClientSecret] = useState('')
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [sessions, setSessions] = useState<SessionSummary[]>([])
+  const [podcasts, setPodcasts] = useState<Podcast[]>([])
   const [progress, setProgress] = useState<UploadProgress | null>(null)
   const [busy, setBusy] = useState(false)
   const [aiBusy, setAiBusy] = useState<string | null>(null)
@@ -42,6 +43,7 @@ export function CloudView(): JSX.Element {
     const s = await window.studiomaster.cloud.getAuthStatus()
     setStatus(s)
     setSessions(await window.studiomaster.cloud.listSessions())
+    setPodcasts(await window.studiomaster.podcasts.list())
     setRunMode(await window.studiomaster.ai.getRunMode())
     setKeySet(await window.studiomaster.ai.hasKey())
     setAutoUpload(await window.studiomaster.cloud.getAutoUpload())
@@ -129,6 +131,10 @@ export function CloudView(): JSX.Element {
   const openFolder = async (id: string): Promise<void> => {
     const err = await window.studiomaster.sessions.openFolder(id)
     if (err) alert(`${t('cloud.folderFailed')}: ${err}`)
+  }
+  const setSessionPodcast = async (id: string, podcastId: string): Promise<void> => {
+    await window.studiomaster.sessions.updateEdit(id, { podcastId })
+    await refresh()
   }
   const editWithAi = async (id: string): Promise<void> => {
     setAiBusy(id)
@@ -275,6 +281,21 @@ export function CloudView(): JSX.Element {
                 {s.guests.length > 0 && (
                   <span className="session__meta">{t('cloud.guests')}: {s.guests.join(', ')}</span>
                 )}
+                <label className="session__podcast">
+                  <span>{t('session.podcast')}</span>
+                  <select
+                    value={s.podcastId ?? ''}
+                    onChange={(e) => setSessionPodcast(s.id, e.target.value)}
+                  >
+                    <option value="">{t('session.podcastNone')}</option>
+                    {podcasts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {podcasts.length === 0 && <span className="hint">{t('session.noPodcasts')}</span>}
                 <EditStatusLine status={s.editStatus} summary={s.editSummary} />
                 <AiProgressBar progress={aiProgress[s.id]} active={s.editStatus === 'running'} />
                 <SessionReview

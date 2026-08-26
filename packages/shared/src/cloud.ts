@@ -64,6 +64,8 @@ export interface SessionEditPatch {
   editNotes?: string
   introOverride?: string
   outroOverride?: string
+  /** Reassign the episode to a different Podcast (show) — '' clears it. */
+  podcastId?: string
 }
 
 /** When the autonomous editor runs after a recording (docs §6.4, transcript). */
