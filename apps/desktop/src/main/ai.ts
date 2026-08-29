@@ -116,7 +116,11 @@ export class AiEditor {
     this.onProgress({ sessionId, phase: 'start', frac: 0, detail: 'מתחיל עריכה…' })
 
     try {
-      const summary = await this.runPilot(session.storagePath, sessionId)
+      const summary = await this.runWorker(session.storagePath, sessionId, [
+        '-m',
+        'ai_workers.pilot',
+        session.storagePath,
+      ])
       const short = summarize(summary)
       this.store.saveSession({ ...session, editStatus: 'done', editSummary: short })
       this.onProgress({ sessionId, phase: 'done', frac: 1, detail: short })
@@ -128,14 +132,29 @@ export class AiEditor {
     }
   }
 
-  private runPilot(
+  /** Re-render one manually-edited target (basic edit or a single reel). The
+   *  timeline editor has already written the edited artifacts to disk; this
+   *  runs the render-only worker and streams progress like a normal edit. */
+  async reedit(
     sessionDir: string,
     sessionId: string,
+    mode: 'basic' | 'reel',
+    reelId?: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const args = ['-m', 'ai_workers.reedit', sessionDir, '--mode', mode]
+    if (mode === 'reel' && reelId) args.push('--reel', reelId)
+    return this.runWorker(sessionDir, sessionId, args)
+  }
+
+  private runWorker(
+    sessionDir: string,
+    sessionId: string,
+    moduleArgs: string[],
   ): Promise<Record<string, unknown> | undefined> {
     return new Promise((resolvePromise, reject) => {
       const python = process.platform === 'win32' ? 'python' : 'python3'
       const key = this.resolveAnthropicKey()
-      const child = spawn(python, ['-u', '-m', 'ai_workers.pilot', sessionDir], {
+      const child = spawn(python, ['-u', ...moduleArgs], {
         cwd: this.workersDir(),
         // Bundled ffmpeg/ffprobe on PATH + the Claude key, so the workers find
         // both with no separate install / env-var setup.

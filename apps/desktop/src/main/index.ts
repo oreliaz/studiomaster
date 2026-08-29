@@ -1,7 +1,7 @@
 import { basename, join } from 'node:path'
 import { mkdirSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { app, dialog, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
+import { app, dialog, shell, BrowserWindow, ipcMain, globalShortcut, protocol } from 'electron'
 import { ObsController } from '@studiomaster/obs-controller'
 import { createPtzController, type PtzController } from '@studiomaster/ptz-control'
 import { createLightingAdapter } from '@studiomaster/lighting'
@@ -26,6 +26,8 @@ import {
   type SessionSummary,
   type StudioProfile,
   type WizardState,
+  type EditorMode,
+  type EditorSave,
 } from '@studiomaster/shared'
 import type { UploadProgress } from '@studiomaster/shared'
 import { createStore } from './store.js'
@@ -33,6 +35,7 @@ import { WizardOrchestrator } from './wizard.js'
 import { RecordingSessionManager } from './session.js'
 import { CloudService } from './cloud.js'
 import { AiEditor } from './ai.js'
+import { EditorService } from './editor.js'
 import { startDockServer } from './dock.js'
 import { splitAudioTracks } from './audioSplit.js'
 import { BackendService } from './backend/index.js'
@@ -80,6 +83,7 @@ const cloud = new CloudService(store, (p: UploadProgress) =>
   broadcast(IPC_EVENTS.uploadProgress, p),
 )
 const ai = new AiEditor(store, (p) => broadcast(IPC_EVENTS.aiProgress, p))
+const editor = new EditorService(store)
 const backend = new BackendService(store)
 
 let ptzController: PtzController | null = null
@@ -510,6 +514,27 @@ function registerIpc(): void {
   ipcMain.handle('settings:set-lang', (_e, lang: string) =>
     store.setSetting(UI_LANG_KEY, lang === 'en' ? 'en' : 'he'),
   )
+
+  // Timeline editor (Premiere-like review over a session's edit artifacts).
+  ipcMain.handle('editor:targets', (_e, sessionId: string) => editor.targets(sessionId))
+  ipcMain.handle('editor:load', (_e, sessionId: string, mode: EditorMode, reelId?: string) =>
+    editor.load(sessionId, mode, reelId),
+  )
+  ipcMain.handle('editor:save', (_e, save: EditorSave) => editor.save(save))
+  ipcMain.handle('editor:reedit', async (_e, save: EditorSave) => {
+    const written = editor.save(save)
+    if (!written.ok) return written
+    const session = store.getSession(save.sessionId)
+    if (!session?.storagePath) return { ok: false, error: 'session not found' }
+    try {
+      const summary = await ai.reedit(session.storagePath, save.sessionId, save.mode, save.reelId)
+      const output = summary && typeof summary['output'] === 'string' ? summary['output'] : undefined
+      const ok = !!summary && summary['ok'] !== false
+      return { ok, output, error: ok ? undefined : 'render failed' }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
   ipcMain.handle('cloud:get-auto-upload', () => autoUploadEnabled())
   ipcMain.handle('cloud:set-auto-upload', (_e, on: boolean) =>
     store.setSetting(AUTO_UPLOAD_KEY, on ? 'true' : 'false'),
@@ -632,6 +657,16 @@ function createWindow(): void {
   }
 }
 
+// Custom scheme for streaming local media (source recordings, clips, rendered
+// outputs) into the renderer's <video> for the timeline editor. Must be
+// declared privileged BEFORE the app is ready.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'sm-media',
+    privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, bypassCSP: true },
+  },
+])
+
 // Only one StudioMaster may run at a time: a second launch would fight the
 // first for the marker hotkeys, the OBS dock port (3939), and the Electron
 // user-data cache (the EADDRINUSE / "failed to register hotkey" / "Unable to
@@ -651,6 +686,19 @@ if (!app.requestSingleInstanceLock()) {
 
 app.whenReady().then(() => {
   if (!app.hasSingleInstanceLock()) return // second instance is quitting
+
+  // Serve sm-media://media/?p=<abs path> from disk (with range support) so the
+  // editor can preview local recordings/clips/outputs.
+  protocol.registerFileProtocol('sm-media', (request, callback) => {
+    try {
+      const u = new URL(request.url)
+      const p = decodeURIComponent(u.searchParams.get('p') ?? '')
+      callback({ path: p })
+    } catch {
+      callback({ statusCode: 400 } as never)
+    }
+  })
+
   // Default the active profile to the first one that has cameras, if unset.
   if (!store.getSetting(ACTIVE_PROFILE_KEY)) {
     const withCams = store.listProfiles().find((p) => p.cameras.length > 0)

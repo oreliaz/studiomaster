@@ -19,6 +19,8 @@ import {
   type StudioProfile,
   type UploadProgress,
   type WizardState,
+  type EditorMode,
+  type EditorSave,
 } from '@studiomaster/shared'
 
 function subscribe<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -146,6 +148,13 @@ const api: StudioMasterApi = {
   },
   settings: {
     setLang: (lang: 'he' | 'en') => ipcRenderer.invoke('settings:set-lang', lang),
+  },
+  editor: {
+    targets: (sessionId: string) => ipcRenderer.invoke('editor:targets', sessionId),
+    load: (sessionId: string, mode: EditorMode, reelId?: string) =>
+      ipcRenderer.invoke('editor:load', sessionId, mode, reelId),
+    save: (save: EditorSave) => ipcRenderer.invoke('editor:save', save),
+    reedit: (save: EditorSave) => ipcRenderer.invoke('editor:reedit', save),
   },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),

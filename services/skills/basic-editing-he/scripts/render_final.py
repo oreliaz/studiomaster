@@ -64,16 +64,23 @@ def run(cmd, label=""):
 
 
 def audio_chain(c):
-    ch = [f"highpass=f={c['highpass_hz']}"]
-    if c["denoise"] and c["denoise"] != "none":
+    """Post-mix dialogue processing. Each effect can be toggled independently
+    (the timeline editor writes fx_* flags); the defaults reproduce the original
+    chain so untouched episodes render identically."""
+    lvl = c.get("dialogue_level", "gentle")
+    strong = lvl == "strong"
+    ch = []
+    if c.get("fx_highpass", True) and c.get("highpass_hz"):
+        ch.append(f"highpass=f={c['highpass_hz']}")
+    if c.get("fx_denoise", True) and c.get("denoise") and c["denoise"] != "none":
         ch.append("afftdn=nf=-25" if c["denoise"] == "afftdn" else c["denoise"])
-    if c["dialogue_level"] == "gentle":
-        ch.append("dynaudnorm=f=250:g=13:p=0.92:m=10:s=10")
-        ch.append("acompressor=threshold=-22dB:ratio=2.5:attack=20:release=250:makeup=2")
-    elif c["dialogue_level"] == "strong":
-        ch.append("dynaudnorm=f=200:g=11:p=0.95:m=12:s=12")
-        ch.append("acompressor=threshold=-20dB:ratio=3.5:attack=15:release=200:makeup=3")
-    return ",".join(ch)
+    if c.get("fx_dynaudnorm", lvl != "off"):
+        ch.append("dynaudnorm=f=200:g=11:p=0.95:m=12:s=12" if strong
+                  else "dynaudnorm=f=250:g=13:p=0.92:m=10:s=10")
+    if c.get("fx_acompressor", lvl != "off"):
+        ch.append("acompressor=threshold=-20dB:ratio=3.5:attack=15:release=200:makeup=3" if strong
+                  else "acompressor=threshold=-22dB:ratio=2.5:attack=20:release=250:makeup=2")
+    return ",".join(ch) if ch else "anull"
 
 
 # Output frame rate (video is forced to this everywhere: vf "fps=30", match_clip).
@@ -153,43 +160,78 @@ def _stream_stats(src, ai):
     return grab("mean_volume"), grab("max_volume")
 
 
-def _active_mics(src, c):
-    """Identify which microphone tracks were actually used.
+def _clamp_gain(g, c):
+    return max(-c["max_mic_gain_db"], min(c["max_mic_gain_db"], g))
 
-    Returns a list of (stream_index, mean_db) for the active mics, or None to
-    signal "no per-mic layout detected — extract the mixed track as usual".
-    Stream 0 is treated as the mixdown and always skipped when >=2 streams exist.
-    """
-    if not c.get("per_mic_audio", True):
-        return None
+
+def _analyze_channels(src, c):
+    """Describe EVERY source audio track for the editor and the renderer.
+
+    Returns a list of channel dicts: {index, label, isMixdown, meanDb, maxDb,
+    active, gainDb}. Stream 0 is the mixdown (dropped by default); each later
+    stream is a microphone, marked active when it was actually used, balanced
+    toward a common level. Returns [] when there is a single track (no layout)."""
     n = _audio_stream_count(src)
     if n < 2:
-        return None                      # single track -> nothing to drop/balance
-    active = []
-    for ai in range(1, n):               # skip stream 0 = mixdown
+        return []
+    chans = []
+    for ai in range(n):
         mean_db, max_db = _stream_stats(src, ai)
-        if max_db is not None and max_db > c["active_max_db"]:
-            active.append((ai, mean_db if mean_db is not None else -30.0))
-    if not active:
-        return None                      # couldn't tell mics apart -> safe fallback
-    return active
+        is_mix = ai == 0
+        used = (not is_mix) and max_db is not None and max_db > c["active_max_db"]
+        gain = _clamp_gain(c["mic_target_db"] - mean_db, c) if (used and mean_db is not None) else 0.0
+        chans.append({
+            "index": ai,
+            "label": ("מיקס" if is_mix else f"מיקרופון {ai}"),
+            "isMixdown": is_mix,
+            "meanDb": mean_db,
+            "maxDb": max_db,
+            "active": bool(used),
+            "gainDb": round(gain, 1),
+        })
+    return chans
+
+
+def _channels_path(work):
+    return os.path.join(work, "audio_channels.json")
+
+
+def _render_mics(work, src, c):
+    """The active microphones to fold into the edit, as [(index, gainDb)].
+
+    Prefers a user-edited audio_channels.json (the timeline editor writes it);
+    otherwise auto-detects, and persists the analysis so the editor can show it.
+    Returns [] to signal "no per-mic layout — extract the mixed track as usual"."""
+    if not c.get("per_mic_audio", True):
+        return []
+    cp = _channels_path(work)
+    if os.path.exists(cp):
+        try:
+            chans = load_json(cp).get("channels", [])
+        except Exception:  # noqa: BLE001
+            chans = []
+    else:
+        chans = _analyze_channels(src, c)
+        if chans:
+            from common import save_json
+            save_json(cp, {"channels": chans})
+    return [(ch["index"], float(ch.get("gainDb", 0.0)))
+            for ch in chans if ch.get("active") and int(ch["index"]) >= 1]
 
 
 def _extract_per_mic(src, raw, mics, c):
-    """Balance the active mics to a common level, fold to mono, and lay that mono
-    signal into BOTH stereo channels (heard equally left+right). Drops the
-    mixdown and every unused track."""
+    """Balance the active mics with their per-channel gains, fold each to mono,
+    then lay the mix into BOTH stereo channels (heard equally left+right).
+    Drops the mixdown and every unused track. `mics` = [(index, gainDb)]."""
     parts = []
-    for j, (ai, mean_db) in enumerate(mics):
-        gain = max(-c["max_mic_gain_db"], min(c["max_mic_gain_db"],
-                                              c["mic_target_db"] - mean_db))
+    for j, (ai, gain) in enumerate(mics):
         parts.append(f"[0:a:{ai}]aformat=channel_layouts=mono,"
-                     f"volume={gain:.1f}dB[m{j}]")
+                     f"volume={_clamp_gain(gain, c):.1f}dB[m{j}]")
     mix = "".join(f"[m{j}]" for j in range(len(mics)))
     parts.append(f"{mix}amix=inputs={len(mics)}:normalize=0[mono]")
     parts.append("[mono]pan=stereo|c0=c0|c1=c0[out]")
     fc = ";".join(parts)
-    labels = ", ".join(f"a:{ai} ({mean:.0f}dB)" for ai, mean in mics)
+    labels = ", ".join(f"a:{ai} ({gain:+.0f}dB)" for ai, gain in mics)
     run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", src,
          "-filter_complex", fc, "-map", "[out]", "-ar", "48000",
          "-c:a", "pcm_s16le", raw], f"balance mics -> mono [{labels}]")
@@ -204,7 +246,7 @@ def build_audio_final(work, c, src, plan):
         return out
     raw = os.path.join(work, "aud_raw.wav")
     if not _ok(raw, plan["total_sec"]):
-        mics = _active_mics(src, c)
+        mics = _render_mics(work, src, c)
         if mics:
             print(f"[render] per-mic audio: keeping {len(mics)} active mic(s), "
                   f"dropping mixdown + unused tracks", flush=True)

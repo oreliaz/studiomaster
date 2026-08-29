@@ -104,6 +104,7 @@ def _write_config(work: Path, job: dict, markers: list[Marker] | None = None) ->
         "target_lufs": d.get("targetLufs", -16.0),
         "language": d.get("language", "he"),
         "auto_detect": True,
+        "trim_silence": d.get("trimSilence", "medium"),
         "deadair_min_sec": da_min,
         "deadair_keep_sec": da_keep,
         "notes": job.get("notes", ""),
@@ -334,6 +335,11 @@ def run_reels(work: Path, capture: Path, job: dict, markers: list[Marker], dry_r
     specs, hooks, selection = _plan_clips(work, markers, duration, count, min_s, max_s, d, guidance)
     (work / "reel_specs.txt").write_text(
         "\n".join(spec_to_arg(s) for s in specs) + ("\n" if specs else ""), "utf-8"
+    )
+    # Persist the per-reel hook lines (keyed by NN) so the timeline editor can
+    # show/edit them and a single-reel re-render can reuse them.
+    (work / "reel_hooks.json").write_text(
+        json.dumps({f"{i:02d}": h for i, h in hooks.items()}, ensure_ascii=False, indent=1), "utf-8"
     )
 
     # 3) cut the selected clips.

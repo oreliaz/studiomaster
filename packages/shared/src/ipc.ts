@@ -15,6 +15,7 @@ import type {
 } from './cloud.js'
 import type { AiJobResult, AiProgress } from './ai.js'
 import type { WizardState } from './wizard.js'
+import type { EditorMode, EditorProject, EditorSave, EditorTarget } from './editor.js'
 
 /**
  * Contract for the Electron IPC bridge exposed on `window.studiomaster`.
@@ -165,6 +166,16 @@ export interface StudioMasterApi {
   settings: {
     /** Persist the UI language so the OBS dock matches the app. */
     setLang(lang: 'he' | 'en'): Promise<void>
+  }
+  editor: {
+    /** The advanced-edit targets for a session (basic + each rendered reel). */
+    targets(sessionId: string): Promise<EditorTarget[]>
+    /** Load a target's full editable project from its on-disk artifacts. */
+    load(sessionId: string, mode: EditorMode, reelId?: string): Promise<EditorProject | null>
+    /** Persist edited cuts/channels/config back to disk (no render yet). */
+    save(save: EditorSave): Promise<{ ok: boolean; error?: string }>
+    /** Save then re-render this target; progress streams via onAiProgress. */
+    reedit(save: EditorSave): Promise<{ ok: boolean; error?: string; output?: string }>
   }
   onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void

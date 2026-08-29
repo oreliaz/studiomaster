@@ -917,3 +917,357 @@ body {
   font-size: 13px;
   margin: 10px 0 0;
 }
+
+/* ── Advanced-edit menu (per session) ─────────────────────────────────────── */
+.adv-edit {
+  position: relative;
+}
+.adv-edit__menu {
+  position: absolute;
+  z-index: 20;
+  inset-inline-start: 0;
+  top: calc(100% + 4px);
+  min-width: 190px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.adv-edit__item {
+  text-align: start;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.adv-edit__item:hover:not(:disabled) {
+  background: var(--card);
+}
+.adv-edit__item:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* ── Timeline editor overlay ──────────────────────────────────────────────── */
+.tl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.tl-modal {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(1200px, 96vw);
+  height: min(860px, 94vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tl-modal--msg {
+  height: auto;
+  padding: 28px;
+  align-items: center;
+  gap: 14px;
+}
+.tl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.tl-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.tl-head__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tl-note {
+  margin: 6px 18px 0;
+  color: var(--warn);
+}
+.tl-progress {
+  margin: 8px 18px;
+  position: relative;
+  height: 20px;
+  background: var(--card-2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.tl-progress__bar {
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+.tl-progress__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.tl-body {
+  flex: 1;
+  display: flex;
+  gap: 12px;
+  padding: 12px 18px 18px;
+  min-height: 0;
+}
+.tl-left {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tl-video {
+  width: 100%;
+  max-height: 46%;
+  background: #000;
+  border-radius: 8px;
+}
+.tl-video--missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+.tl-playhead-read {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.tl-zoom {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tl-scroll {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.tl-track-area {
+  position: relative;
+  min-height: 100%;
+  /* Time always flows left→right (like a video editor), even in an RTL UI, so
+     inset-inline-start == left and the ruler-click math stays consistent. */
+  direction: ltr;
+}
+.tl-ruler {
+  position: relative;
+  height: 22px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.tl-ruler__tick {
+  position: absolute;
+  top: 3px;
+  font-size: 10px;
+  color: var(--muted);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.tl-lane {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+.tl-lane--txt {
+  height: 54px;
+  padding: 4px 0;
+}
+.tl-lane--cuts {
+  height: 30px;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, 0.14),
+    rgba(239, 68, 68, 0.14) 6px,
+    transparent 6px,
+    transparent 12px
+  );
+}
+.tl-seg {
+  position: absolute;
+  top: 4px;
+  height: 44px;
+  overflow: hidden;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-align: start;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tl-seg:hover {
+  border-color: var(--primary);
+}
+.tl-keep {
+  position: absolute;
+  top: 3px;
+  height: 24px;
+  background: rgba(34, 197, 94, 0.35);
+  border: 1px solid var(--ok);
+  border-radius: 4px;
+}
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--record);
+  pointer-events: none;
+}
+.tl-side {
+  width: 320px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tl-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.tl-panel h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tl-cuts {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow: auto;
+}
+.tl-cut {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.tl-cut__n {
+  width: 18px;
+  color: var(--muted);
+}
+.tl-ms {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+.tl-ms input {
+  width: 84px;
+  padding: 3px 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tl-chan {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+.tl-chan--mix {
+  opacity: 0.75;
+}
+.tl-chan__meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 2px 0;
+}
+.tl-gain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tl-gain input[type='range'] {
+  flex: 1;
+}
+.tl-gain__val {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  width: 58px;
+  text-align: end;
+}
+.tl-tag,
+.tl-fx__detail {
+  font-size: 10px;
+  color: var(--muted);
+  margin-inline-start: 6px;
+}
+.tl-fx {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+}
+.tl-fx__count {
+  margin-top: 6px;
+}
+.tl-caps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+}
+.tl-caps li {
+  padding: 3px 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.tl-caps__tc {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-inline-end: 6px;
+}
+.check--inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.field--inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.field--inline input {
+  width: 90px;
+}
+.btn--tiny {
+  padding: 3px 7px;
+  font-size: 12px;
+}

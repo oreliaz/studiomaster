@@ -4,6 +4,8 @@ import {
   type AiProgress,
   type CalendarEvent,
   type EditStatus,
+  type EditorMode,
+  type EditorTarget,
   type GoogleAuthStatus,
   type Podcast,
   type RequestedDeliverables,
@@ -13,6 +15,7 @@ import {
   type UploadProgress,
 } from '@studiomaster/shared'
 import { t } from '../i18n.js'
+import { TimelineEditor } from './TimelineEditor.js'
 
 const CAT_LABEL: Record<ReviewMarker['category'], string> = {
   fix: 'live.catFix',
@@ -38,6 +41,11 @@ export function CloudView(): JSX.Element {
   const [keySet, setKeySet] = useState(false)
   const [keyInput, setKeyInput] = useState('')
   const [autoUpload, setAutoUpload] = useState(true)
+  const [editing, setEditing] = useState<{
+    sessionId: string
+    mode: EditorMode
+    reelId?: string
+  } | null>(null)
 
   const refresh = async (): Promise<void> => {
     const s = await window.studiomaster.cloud.getAuthStatus()
@@ -306,6 +314,10 @@ export function CloudView(): JSX.Element {
                 />
               </div>
               <div className="session__actions">
+                <AdvancedEditMenu
+                  sessionId={s.id}
+                  onOpen={(mode, reelId) => setEditing({ sessionId: s.id, mode, reelId })}
+                />
                 <button className="btn btn--small" onClick={() => openFolder(s.id)}>
                   📁 {t('session.openFolder')}
                 </button>
@@ -347,7 +359,69 @@ export function CloudView(): JSX.Element {
           </p>
         )}
       </section>
+
+      {editing && (
+        <TimelineEditor
+          sessionId={editing.sessionId}
+          mode={editing.mode}
+          reelId={editing.reelId}
+          onClose={() => {
+            setEditing(null)
+            void refresh()
+          }}
+        />
+      )}
     </>
+  )
+}
+
+/** Per-session menu opening the graphical timeline editor for the basic edit or
+ *  any rendered reel. Lets the user open a Premiere-like view for episodes the
+ *  system already edited. */
+function AdvancedEditMenu({
+  sessionId,
+  onOpen,
+}: {
+  sessionId: string
+  onOpen: (mode: EditorMode, reelId?: string) => void
+}): JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [targets, setTargets] = useState<EditorTarget[] | null>(null)
+
+  const toggle = async (): Promise<void> => {
+    const next = !open
+    setOpen(next)
+    if (next && targets === null) {
+      setTargets(await window.studiomaster.editor.targets(sessionId))
+    }
+  }
+
+  return (
+    <div className="adv-edit">
+      <button className="btn btn--small" onClick={toggle}>
+        🎬 {t('editor.menu')} {open ? '▴' : '▾'}
+      </button>
+      {open && (
+        <div className="adv-edit__menu">
+          {targets === null && <span className="hint">{t('editor.loading')}</span>}
+          {targets?.length === 0 && <span className="hint">{t('editor.noTargets')}</span>}
+          {targets?.map((tg) => (
+            <button
+              key={`${tg.mode}:${tg.reelId ?? ''}`}
+              className="adv-edit__item"
+              disabled={!tg.ready}
+              onClick={() => {
+                setOpen(false)
+                onOpen(tg.mode, tg.reelId)
+              }}
+            >
+              {tg.label}
+              {!tg.ready && <span className="hint"> · {t('editor.notReady')}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
