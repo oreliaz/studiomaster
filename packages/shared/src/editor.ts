@@ -92,6 +92,13 @@ export interface EditorProject {
   channels: EditorAudioChannel[]
   effects: EditorAudioEffect[]
   config: EditorConfig
+  /** Intro/outro clip lengths (seconds), for the assembly strip on the timeline. */
+  introSec?: number
+  outroSec?: number
+  /** Where the intro drops in, in SOURCE seconds (null/undefined = at the start). */
+  introCueSec?: number | null
+  /** True when this target was synthesised from a raw recording (no auto-edit yet). */
+  fromScratch?: boolean
   /** Warnings surfaced while loading (missing transcript, not yet edited, …). */
   notes: string[]
 }
@@ -107,6 +114,8 @@ export interface EditorSave {
   channels?: { index: number; active: boolean; gainDb: number }[]
   effects?: { id: EditorAudioEffect['id']; enabled: boolean }[]
   config?: Partial<EditorConfig>
+  /** Intro insertion point in SOURCE seconds; null clears it (intro at start). */
+  introCueSec?: number | null
 }
 
 /** One entry in a session's "advanced edit" menu (basic + each rendered reel). */

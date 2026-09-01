@@ -43,37 +43,43 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
   const [targetLufs, setTargetLufs] = useState(-16)
   const [intro, setIntro] = useState('')
   const [outro, setOutro] = useState('')
+  const [introCue, setIntroCue] = useState<number | null>(null)
   const [zoom, setZoom] = useState(14) // px per second
   const [time, setTime] = useState(0)
   const [showOutput, setShowOutput] = useState(false)
   const [reediting, setReediting] = useState(false)
   const [progress, setProgress] = useState<AiProgress | null>(null)
   const [savedTick, setSavedTick] = useState(false)
+  const [mediaVersion, setMediaVersion] = useState(0) // cache-buster after re-render
 
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // Seed every editable field from a freshly-loaded project (initial + reload
+  // after a re-edit, so the timeline always reflects what's on disk).
+  const applyProject = useCallback((p: EditorProject): void => {
+    setProject(p)
+    setKept(p.kept)
+    if (p.window) setWin(p.window)
+    setHook(p.hook ?? '')
+    setChannels(p.channels)
+    setEffects(p.effects)
+    setTargetLufs(p.config.targetLufs)
+    setIntro(p.config.intro ?? '')
+    setOutro(p.config.outro ?? '')
+    setIntroCue(p.introCueSec ?? null)
+  }, [])
 
   useEffect(() => {
     let alive = true
     void window.studiomaster.editor.load(sessionId, mode, reelId).then((p) => {
       if (!alive) return
-      if (!p) {
-        setError(t('editor.loadFailed'))
-        return
-      }
-      setProject(p)
-      setKept(p.kept)
-      if (p.window) setWin(p.window)
-      setHook(p.hook ?? '')
-      setChannels(p.channels)
-      setEffects(p.effects)
-      setTargetLufs(p.config.targetLufs)
-      setIntro(p.config.intro ?? '')
-      setOutro(p.config.outro ?? '')
+      if (!p) setError(t('editor.loadFailed'))
+      else applyProject(p)
     })
     return () => {
       alive = false
     }
-  }, [sessionId, mode, reelId])
+  }, [sessionId, mode, reelId, applyProject])
 
   useEffect(() => {
     return window.studiomaster.onAiProgress((p) => {
@@ -81,19 +87,23 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
       setProgress(p)
       if (p.phase === 'done' || p.phase === 'error') {
         setReediting(false)
-        // Reload so the rendered output + any recomputed data refresh.
+        // Reload so the timeline + rendered output reflect the new render.
         void window.studiomaster.editor.load(sessionId, mode, reelId).then((np) => {
-          if (np) {
-            setProject(np)
-            if (np.hasOutput) setShowOutput(true)
-          }
+          if (!np) return
+          applyProject(np)
+          setMediaVersion((v) => v + 1)
+          if (np.hasOutput) setShowOutput(true)
         })
       }
     })
-  }, [sessionId, mode, reelId])
+  }, [sessionId, mode, reelId, applyProject])
 
   const duration = project?.durationSec ?? 0
-  const mediaUrl = showOutput && project?.outputUrl ? project.outputUrl : project?.mediaUrl
+  const baseMedia = showOutput && project?.outputUrl ? project.outputUrl : project?.mediaUrl
+  // Append a version so the <video> reloads the freshly-rendered file.
+  const mediaUrl = baseMedia
+    ? `${baseMedia}${baseMedia.includes('?') ? '&' : '?'}v=${mediaVersion}`
+    : undefined
 
   const seek = useCallback((sec: number) => {
     const v = videoRef.current
@@ -111,6 +121,7 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
       channels: channels.map((c) => ({ index: c.index, active: c.active, gainDb: c.gainDb })),
       effects: effects.map((e) => ({ id: e.id, enabled: e.enabled })),
       config: { targetLufs, intro: intro || undefined, outro: outro || undefined },
+      introCueSec: intro ? introCue : null,
     }
   }
 
@@ -254,6 +265,15 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
               </div>
             </div>
 
+            {mode === 'basic' && (project.introSec || project.outroSec) && (
+              <AssemblyStrip
+                introSec={project.introSec}
+                outroSec={project.outroSec}
+                bodySec={kept.reduce((s, k) => s + Math.max(0, k.end - k.start), 0)}
+                introAtStart={introCue == null || introCue <= 0.5}
+              />
+            )}
+
             {/* Timeline: ruler + transcript + cuts/window */}
             <div className="tl-scroll">
               <div className="tl-track-area" style={{ width }}>
@@ -273,6 +293,14 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
                   />
                 ) : (
                   <WindowLane window={win} onChange={setWin} duration={duration} zoom={zoom} />
+                )}
+                {mode === 'basic' && intro && introCue != null && (
+                  <IntroCueMarker
+                    cue={introCue}
+                    duration={duration}
+                    zoom={zoom}
+                    onChange={setIntroCue}
+                  />
                 )}
                 <div className="tl-playhead" style={{ insetInlineStart: time * zoom }} />
               </div>
@@ -404,6 +432,27 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
                     <span>{t('review.intro')}</span>
                     <input value={intro} onChange={(e) => setIntro(e.target.value)} />
                   </label>
+                  {intro && (
+                    <div className="tl-cue-row">
+                      <label className="check check--inline">
+                        <input
+                          type="checkbox"
+                          checked={introCue != null}
+                          onChange={(e) => setIntroCue(e.target.checked ? time : null)}
+                        />
+                        {t('editor.introCue')}
+                      </label>
+                      {introCue != null && (
+                        <div className="tl-cue-row__set">
+                          <MsInput value={introCue} onChange={setIntroCue} onSeek={seek} />
+                          <button className="btn btn--tiny" onClick={() => setIntroCue(time)}>
+                            {t('editor.cueAtPlayhead')}
+                          </button>
+                        </div>
+                      )}
+                      <p className="hint">{t('editor.introCueHint')}</p>
+                    </div>
+                  )}
                   <label className="field">
                     <span>{t('review.outro')}</span>
                     <input value={outro} onChange={(e) => setOutro(e.target.value)} />
@@ -772,6 +821,96 @@ function WindowLane({
         <span className="tl-keep__handle tl-keep__handle--l" onPointerDown={(e) => startDrag(e, 'l')} />
         <span className="tl-keep__handle tl-keep__handle--r" onPointerDown={(e) => startDrag(e, 'r')} />
       </div>
+    </div>
+  )
+}
+
+/** A proportional "final assembly" strip: intro | body | outro, so the user
+ *  sees where the intro/outro sit in the finished episode. */
+function AssemblyStrip({
+  introSec,
+  bodySec,
+  outroSec,
+  introAtStart,
+}: {
+  introSec?: number
+  bodySec: number
+  outroSec?: number
+  introAtStart: boolean
+}): JSX.Element {
+  const intro = introSec ?? 0
+  const outro = outroSec ?? 0
+  const total = intro + bodySec + outro || 1
+  const pct = (v: number): string => `${(v / total) * 100}%`
+  return (
+    <div className="tl-assembly">
+      <span className="tl-assembly__label">{t('editor.assembly')}</span>
+      <div className="tl-assembly__bar">
+        {intro > 0 && introAtStart && (
+          <div className="tl-assembly__seg tl-assembly__seg--intro" style={{ width: pct(intro) }}>
+            {t('editor.intro')} · {fmtMs(intro)}
+          </div>
+        )}
+        <div className="tl-assembly__seg tl-assembly__seg--body" style={{ width: pct(bodySec) }}>
+          {t('editor.body')} · {fmtMs(bodySec)}
+          {intro > 0 && !introAtStart && (
+            <span className="tl-assembly__inline">＋{t('editor.intro')}</span>
+          )}
+        </div>
+        {outro > 0 && (
+          <div className="tl-assembly__seg tl-assembly__seg--outro" style={{ width: pct(outro) }}>
+            {t('editor.outro')} · {fmtMs(outro)}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Draggable marker on the source timeline for where the intro drops in. */
+function IntroCueMarker({
+  cue,
+  duration,
+  zoom,
+  onChange,
+}: {
+  cue: number
+  duration: number
+  zoom: number
+  onChange: (sec: number) => void
+}): JSX.Element {
+  const dragging = useRef(false)
+  const onMove = useCallback(
+    (e: PointerEvent) => {
+      if (!dragging.current) return
+      const lane = (e.target as HTMLElement).ownerDocument
+        .querySelector('.tl-lane--cuts')
+        ?.getBoundingClientRect()
+      if (!lane) return
+      onChange(clamp((e.clientX - lane.left) / zoom, 0, duration))
+    },
+    [zoom, duration, onChange],
+  )
+  const end = useCallback(() => {
+    dragging.current = false
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', end)
+  }, [onMove])
+  useEffect(() => () => end(), [end])
+  return (
+    <div
+      className="tl-cue"
+      style={{ insetInlineStart: cue * zoom }}
+      title={`${t('editor.introCue')} · ${fmtMs(cue)}`}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.preventDefault()
+        dragging.current = true
+        window.addEventListener('pointermove', onMove)
+        window.addEventListener('pointerup', end)
+      }}
+    >
+      🎬
     </div>
   )
 }

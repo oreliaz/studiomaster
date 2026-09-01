@@ -1194,6 +1194,78 @@ body {
   margin: 6px 2px 0;
   font-size: 11px;
 }
+
+/* Final-assembly strip (intro | body | outro) */
+.tl-assembly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+}
+.tl-assembly__label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.tl-assembly__bar {
+  flex: 1;
+  display: flex;
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.tl-assembly__seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  gap: 4px;
+}
+.tl-assembly__seg--intro {
+  background: #0369a1;
+}
+.tl-assembly__seg--body {
+  background: #1f6f43;
+}
+.tl-assembly__seg--outro {
+  background: #6d28d9;
+}
+.tl-assembly__inline {
+  background: rgba(56, 189, 248, 0.5);
+  border-radius: 3px;
+  padding: 0 3px;
+}
+
+/* Intro-cue marker on the source timeline */
+.tl-cue {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  border-inline-start: 2px dashed #38bdf8;
+  cursor: ew-resize;
+  font-size: 13px;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 1px;
+  user-select: none;
+}
+.tl-cue-row {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.tl-cue-row__set {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
 .tl-playhead {
   position: absolute;
   top: 0;

@@ -1,4 +1,5 @@
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import type {
   EditorAudioChannel,
@@ -11,8 +12,26 @@ import type {
   EditorTranscriptSeg,
 } from '@studiomaster/shared'
 import type { Store } from './store.js'
+import { ffprobe, ffmpegEnv } from './ffmpeg.js'
 
 const FPS = 30
+
+/** Media duration in seconds via ffprobe, or 0 if it can't be read. */
+function probeDurationSec(path: string): number {
+  if (!path || !existsSync(path)) return 0
+  try {
+    const r = spawnSync(
+      ffprobe,
+      ['-v', 'error', '-show_entries', 'format=duration', '-of',
+        'default=noprint_wrappers=1:nokey=1', path],
+      { encoding: 'utf8', env: ffmpegEnv() },
+    )
+    const v = parseFloat((r.stdout ?? '').trim())
+    return Number.isFinite(v) ? v : 0
+  } catch {
+    return 0
+  }
+}
 
 /** Build the sm-media:// URL the renderer's <video> loads for a local file. */
 export function smMediaUrl(path: string): string {
@@ -58,6 +77,7 @@ interface RawConfig {
   fx_denoise?: boolean
   fx_dynaudnorm?: boolean
   fx_acompressor?: boolean
+  intro_cue_sec?: number
 }
 interface RawPlan {
   source: string
@@ -93,13 +113,24 @@ export class EditorService {
     return session?.storagePath ? session.storagePath : null
   }
 
+  private capturePath(sessionId: string): string {
+    return this.store.getSession(sessionId)?.capturePath ?? ''
+  }
+
   /** The advanced-edit targets available for a session (basic + each reel). */
   targets(sessionId: string): EditorTarget[] {
     const root = this.workDir(sessionId)
     if (!root) return []
     const targets: EditorTarget[] = []
     const basicPlan = join(root, 'work', 'edit_plan.json')
-    targets.push({ mode: 'basic', label: 'עריכה בסיסית', ready: existsSync(basicPlan) })
+    // Basic editing is available even before any auto-edit: from a raw
+    // recording the user can cut purely on the timeline.
+    const capture = this.capturePath(sessionId)
+    targets.push({
+      mode: 'basic',
+      label: 'עריכה בסיסית',
+      ready: existsSync(basicPlan) || existsSync(capture),
+    })
 
     // One entry per reel that has a spec (rendered or not).
     const specs = this.readReelSpecs(root)
@@ -126,18 +157,36 @@ export class EditorService {
 
   private loadBasic(sessionId: string, root: string): EditorProject | null {
     const work = join(root, 'work')
-    const plan = readJson<RawPlan>(join(work, 'edit_plan.json'))
-    if (!plan) return null
     const notes: string[] = []
-    // The render/effect config lives in config.json (target loudness, denoise,
-    // per-effect fx_* toggles); plan.config only holds planning defaults.
-    const cfg: RawConfig = {
-      ...(plan.config ?? {}),
-      ...(readJson<RawConfig>(join(work, 'config.json')) ?? {}),
+    // config.json lives at the session ROOT (render_final reads dirname(work)).
+    const cfg: RawConfig = readJson<RawConfig>(join(root, 'config.json')) ?? {}
+
+    const plan = readJson<RawPlan>(join(work, 'edit_plan.json'))
+    const capture = this.capturePath(sessionId)
+
+    // Source + full timeline: from the plan when it exists, else synthesised
+    // from the raw recording so the user can cut on the timeline with no edit yet.
+    let source: string
+    let durationSec: number
+    let kept: EditorRange[]
+    let fromScratch = false
+    if (plan) {
+      Object.assign(cfg, plan.config ?? {}, readJson<RawConfig>(join(root, 'config.json')) ?? {})
+      source = plan.source
+      durationSec = plan.total_sec
+      kept = plan.kept.map((k) => ({ start: k.start, end: k.end }))
+    } else {
+      source = capture
+      durationSec = probeDurationSec(capture)
+      if (durationSec <= 0) return null // nothing to edit
+      kept = [{ start: 0, end: durationSec }]
+      fromScratch = true
+      notes.push('הפרק טרם נערך — חתוך על ציר הזמן והפעל "ערוך מחדש"')
     }
 
     const transcript = readJson<RawTranscript>(join(work, 'transcript.json'))?.segments ?? []
-    if (transcript.length === 0) notes.push('אין תמלול — הרץ עריכה בסיסית כדי לראות טקסט')
+    if (transcript.length === 0 && !fromScratch)
+      notes.push('אין תמלול — ניתן לערוך על בסיס ציר הזמן בלבד')
 
     const rawChannels = readJson<{ channels: RawChannel[] }>(join(work, 'audio_channels.json'))
     const channels: EditorAudioChannel[] = (rawChannels?.channels ?? []).map((c) => ({
@@ -151,28 +200,33 @@ export class EditorService {
     }))
     if (channels.length === 0) notes.push('ערוצי הסאונד ינותחו בעריכה הבאה')
 
-    const source = plan.source
     const finalPath = join(work, 'final.mp4')
+    const intro = cfg.intro ?? undefined
+    const outro = cfg.outro ?? undefined
     return {
       sessionId,
       mode: 'basic',
-      title: basename(source),
+      title: basename(source || 'recording'),
       source,
       mediaUrl: existsSync(source) ? smMediaUrl(source) : undefined,
       outputUrl: existsSync(finalPath) ? smMediaUrl(finalPath) : undefined,
       hasOutput: existsSync(finalPath),
       fps: FPS,
-      durationSec: plan.total_sec,
-      kept: plan.kept.map((k) => ({ start: k.start, end: k.end })),
+      durationSec,
+      kept,
       transcript,
       channels,
       effects: this.effectsOf(cfg),
       config: {
         targetLufs: cfg.target_lufs ?? -16,
         trimSilence: (cfg.trim_silence as EditorProject['config']['trimSilence']) ?? 'medium',
-        intro: cfg.intro ?? undefined,
-        outro: cfg.outro ?? undefined,
+        intro,
+        outro,
       },
+      introSec: intro && existsSync(intro) ? probeDurationSec(intro) : undefined,
+      outroSec: outro && existsSync(outro) ? probeDurationSec(outro) : undefined,
+      introCueSec: typeof cfg.intro_cue_sec === 'number' ? cfg.intro_cue_sec : null,
+      fromScratch,
       notes,
     }
   }
@@ -260,9 +314,21 @@ export class EditorService {
 
   private saveBasic(root: string, save: EditorSave): void {
     const work = join(root, 'work')
+    mkdirSync(work, { recursive: true })
     const planPath = join(work, 'edit_plan.json')
-    const plan = readJson<RawPlan & Record<string, unknown>>(planPath)
-    if (!plan) throw new Error('edit_plan.json missing')
+    // Create a plan from the raw recording if none exists (editing from scratch).
+    let plan = readJson<RawPlan & Record<string, unknown>>(planPath)
+    if (!plan) {
+      const source = this.capturePath(save.sessionId)
+      const total = probeDurationSec(source)
+      if (!source || total <= 0) throw new Error('no recording to edit')
+      plan = {
+        source,
+        total_sec: round3(total),
+        kept: [{ start: 0, end: round3(total) }],
+        config: {},
+      } as RawPlan & Record<string, unknown>
+    }
 
     if (save.kept) {
       const kept = save.kept
@@ -283,17 +349,22 @@ export class EditorService {
       plan.removed_sec = round3(total - keptSec)
       plan.n_removals = removals.length
       plan.removals = removals
-      writeFileSync(planPath, JSON.stringify(plan, null, 1), 'utf8')
     }
+    writeFileSync(planPath, JSON.stringify(plan, null, 1), 'utf8')
 
-    // config.json — target loudness, intro/outro, per-effect toggles.
-    const cfgPath = join(work, 'config.json')
+    // config.json — at the session ROOT (render_final reads dirname(work)).
+    const cfgPath = join(root, 'config.json')
     const cfg = (readJson<RawConfig & Record<string, unknown>>(cfgPath) ?? {}) as RawConfig &
       Record<string, unknown>
+    if (!cfg.source) cfg.source = plan.source // so render can resolve the input
     if (save.config) {
       if (save.config.targetLufs !== undefined) cfg.target_lufs = save.config.targetLufs
       if (save.config.intro !== undefined) cfg.intro = save.config.intro || null
       if (save.config.outro !== undefined) cfg.outro = save.config.outro || null
+    }
+    if (save.introCueSec !== undefined) {
+      if (save.introCueSec === null) delete cfg.intro_cue_sec
+      else cfg.intro_cue_sec = round3(save.introCueSec)
     }
     if (save.effects) {
       for (const e of save.effects) {
