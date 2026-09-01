@@ -318,6 +318,15 @@ export function CloudView(): JSX.Element {
                   sessionId={s.id}
                   onOpen={(mode, reelId) => setEditing({ sessionId: s.id, mode, reelId })}
                 />
+                {s.editStatus === 'done' && (
+                  <button
+                    className="btn btn--small"
+                    onClick={() => window.studiomaster.editor.openOutput(s.id, 'basic')}
+                    title={t('editor.openFileHint')}
+                  >
+                    ▶ {t('editor.openFile')}
+                  </button>
+                )}
                 <button className="btn btn--small" onClick={() => openFolder(s.id)}>
                   📁 {t('session.openFolder')}
                 </button>

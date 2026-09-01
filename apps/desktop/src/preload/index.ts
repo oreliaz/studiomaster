@@ -155,6 +155,8 @@ const api: StudioMasterApi = {
       ipcRenderer.invoke('editor:load', sessionId, mode, reelId),
     save: (save: EditorSave) => ipcRenderer.invoke('editor:save', save),
     reedit: (save: EditorSave) => ipcRenderer.invoke('editor:reedit', save),
+    openOutput: (sessionId: string, mode: EditorMode, reelId?: string) =>
+      ipcRenderer.invoke('editor:open-output', sessionId, mode, reelId),
   },
   onConnectionState: (cb: (state: ObsConnectionState) => void) =>
     subscribe(IPC_EVENTS.obsConnection, cb),

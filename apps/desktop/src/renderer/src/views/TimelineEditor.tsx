@@ -105,10 +105,27 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
     ? `${baseMedia}${baseMedia.includes('?') ? '&' : '?'}v=${mediaVersion}`
     : undefined
 
-  const seek = useCallback((sec: number) => {
-    const v = videoRef.current
-    if (v) v.currentTime = Math.max(0, sec)
-  }, [])
+  const pendingSeek = useRef<number | null>(null)
+  // Seek the preview. `toSource` (transcript/timeline clicks in basic mode)
+  // flips the preview back to the source so the frame matches the word's
+  // source-time; if the src has to swap, the seek is applied once it reloads.
+  const seek = useCallback(
+    (sec: number, toSource = false) => {
+      const target = Math.max(0, sec)
+      if (toSource && showOutput) {
+        pendingSeek.current = target
+        setShowOutput(false)
+        return
+      }
+      const v = videoRef.current
+      if (v) v.currentTime = target
+    },
+    [showOutput],
+  )
+  const timelineSeek = useCallback(
+    (sec: number) => seek(sec, mode === 'basic'),
+    [seek, mode],
+  )
 
   const collectSave = (): EditorSave => {
     if (mode === 'reel') {
@@ -219,6 +236,15 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
             <button className="btn btn--small btn--primary" onClick={reedit} disabled={reediting}>
               {reediting ? t('editor.rendering') : t('editor.reedit')}
             </button>
+            {project.hasOutput && (
+              <button
+                className="btn btn--small"
+                onClick={() => window.studiomaster.editor.openOutput(sessionId, mode, reelId)}
+                title={t('editor.openFileHint')}
+              >
+                📂 {t('editor.openFile')}
+              </button>
+            )}
             <button className="btn btn--small btn--ghost" onClick={onClose}>
               {t('common.close')}
             </button>
@@ -246,6 +272,12 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
                 src={mediaUrl}
                 controls
                 onTimeUpdate={(e) => setTime((e.target as HTMLVideoElement).currentTime)}
+                onLoadedData={(e) => {
+                  if (pendingSeek.current != null) {
+                    ;(e.target as HTMLVideoElement).currentTime = pendingSeek.current
+                    pendingSeek.current = null
+                  }
+                }}
               />
             ) : (
               <div className="tl-video tl-video--missing">
@@ -265,8 +297,10 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
               </div>
             </div>
 
-            {mode === 'basic' && (project.introSec || project.outroSec) && (
+            {mode === 'basic' && (intro || outro) && (
               <AssemblyStrip
+                hasIntro={!!intro}
+                hasOutro={!!outro}
                 introSec={project.introSec}
                 outroSec={project.outroSec}
                 bodySec={kept.reduce((s, k) => s + Math.max(0, k.end - k.start), 0)}
@@ -277,19 +311,15 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
             {/* Timeline: ruler + transcript + cuts/window */}
             <div className="tl-scroll">
               <div className="tl-track-area" style={{ width }}>
-                <Ruler duration={duration} zoom={zoom} onSeek={seek} />
-                <TranscriptLane
-                  segments={project.transcript}
-                  zoom={zoom}
-                  onSeek={seek}
-                />
+                <Ruler duration={duration} zoom={zoom} onSeek={timelineSeek} />
+                <TranscriptLane segments={project.transcript} zoom={zoom} onSeek={timelineSeek} />
                 {mode === 'basic' ? (
                   <CutsLane
                     kept={kept}
                     onChange={setKept}
                     duration={duration}
                     zoom={zoom}
-                    onSeek={seek}
+                    onSeek={timelineSeek}
                   />
                 ) : (
                   <WindowLane window={win} onChange={setWin} duration={duration} zoom={zoom} />
@@ -417,6 +447,20 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
                     )}
                   </p>
                 </section>
+
+                {project.transcript.length > 0 && (
+                  <section className="tl-panel">
+                    <h3>{t('editor.transcript')}</h3>
+                    <p className="hint">{t('editor.transcriptHint')}</p>
+                    <ul className="tl-caps">
+                      {project.transcript.map((s, i) => (
+                        <li key={i} onClick={() => seek(s.start, true)}>
+                          <span className="tl-caps__tc">{fmtMs(s.start)}</span> {s.text}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
 
                 <section className="tl-panel">
                   <h3>{t('editor.output')}</h3>
@@ -828,38 +872,48 @@ function WindowLane({
 /** A proportional "final assembly" strip: intro | body | outro, so the user
  *  sees where the intro/outro sit in the finished episode. */
 function AssemblyStrip({
+  hasIntro,
+  hasOutro,
   introSec,
   bodySec,
   outroSec,
   introAtStart,
 }: {
+  hasIntro: boolean
+  hasOutro: boolean
   introSec?: number
   bodySec: number
   outroSec?: number
   introAtStart: boolean
 }): JSX.Element {
-  const intro = introSec ?? 0
-  const outro = outroSec ?? 0
-  const total = intro + bodySec + outro || 1
+  // Use a nominal width when a clip's length isn't known yet (file not probed),
+  // so the block still appears on the strip.
+  const nominal = Math.max(6, bodySec * 0.06)
+  const introW = hasIntro ? (introSec ?? nominal) : 0
+  const outroW = hasOutro ? (outroSec ?? nominal) : 0
+  const total = introW + bodySec + outroW || 1
   const pct = (v: number): string => `${(v / total) * 100}%`
+  const len = (s?: number): string => (s ? ` · ${fmtMs(s)}` : '')
   return (
     <div className="tl-assembly">
       <span className="tl-assembly__label">{t('editor.assembly')}</span>
       <div className="tl-assembly__bar">
-        {intro > 0 && introAtStart && (
-          <div className="tl-assembly__seg tl-assembly__seg--intro" style={{ width: pct(intro) }}>
-            {t('editor.intro')} · {fmtMs(intro)}
+        {hasIntro && introAtStart && (
+          <div className="tl-assembly__seg tl-assembly__seg--intro" style={{ width: pct(introW) }}>
+            {t('editor.intro')}
+            {len(introSec)}
           </div>
         )}
         <div className="tl-assembly__seg tl-assembly__seg--body" style={{ width: pct(bodySec) }}>
           {t('editor.body')} · {fmtMs(bodySec)}
-          {intro > 0 && !introAtStart && (
+          {hasIntro && !introAtStart && (
             <span className="tl-assembly__inline">＋{t('editor.intro')}</span>
           )}
         </div>
-        {outro > 0 && (
-          <div className="tl-assembly__seg tl-assembly__seg--outro" style={{ width: pct(outro) }}>
-            {t('editor.outro')} · {fmtMs(outro)}
+        {hasOutro && (
+          <div className="tl-assembly__seg tl-assembly__seg--outro" style={{ width: pct(outroW) }}>
+            {t('editor.outro')}
+            {len(outroSec)}
           </div>
         )}
       </div>

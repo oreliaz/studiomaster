@@ -521,6 +521,14 @@ function registerIpc(): void {
     editor.load(sessionId, mode, reelId),
   )
   ipcMain.handle('editor:save', (_e, save: EditorSave) => editor.save(save))
+  ipcMain.handle(
+    'editor:open-output',
+    async (_e, sessionId: string, mode: EditorMode, reelId?: string) => {
+      const p = editor.outputPath(sessionId, mode, reelId)
+      if (!p) return 'no output file yet'
+      return shell.openPath(p) // '' on success, else an error message
+    },
+  )
   ipcMain.handle('editor:reedit', async (_e, save: EditorSave) => {
     const written = editor.save(save)
     if (!written.ok) return written

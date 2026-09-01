@@ -176,6 +176,8 @@ export interface StudioMasterApi {
     save(save: EditorSave): Promise<{ ok: boolean; error?: string }>
     /** Save then re-render this target; progress streams via onAiProgress. */
     reedit(save: EditorSave): Promise<{ ok: boolean; error?: string; output?: string }>
+    /** Open the rendered output file in the OS default player. '' on success. */
+    openOutput(sessionId: string, mode: EditorMode, reelId?: string): Promise<string>
   }
   onAiProgress(cb: (progress: AiProgress) => void): () => void
   onConnectionState(cb: (state: ObsConnectionState) => void): () => void

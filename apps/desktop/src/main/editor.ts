@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import type {
   EditorAudioChannel,
   EditorAudioEffect,
@@ -201,8 +201,18 @@ export class EditorService {
     if (channels.length === 0) notes.push('ערוצי הסאונד ינותחו בעריכה הבאה')
 
     const finalPath = join(work, 'final.mp4')
-    const intro = cfg.intro ?? undefined
-    const outro = cfg.outro ?? undefined
+    // Effective intro/outro: config.json → per-episode overrides → the podcast's
+    // deliverables, resolved to an absolute path (relative to the session dir the
+    // way render_final resolves them). This makes an episode whose intro/outro
+    // come from its show show them on the timeline and apply them on re-edit.
+    const session = this.store.getSession(sessionId)
+    const podcast = session?.podcastId ? this.store.getPodcast(session.podcastId) : null
+    const resolveClip = (p?: string | null): string | undefined => {
+      if (!p) return undefined
+      return isAbsolute(p) ? p : join(root, p)
+    }
+    const intro = resolveClip(cfg.intro || session?.introOverride || podcast?.deliverables?.intro)
+    const outro = resolveClip(cfg.outro || session?.outroOverride || podcast?.deliverables?.outro)
     return {
       sessionId,
       mode: 'basic',
@@ -223,12 +233,23 @@ export class EditorService {
         intro,
         outro,
       },
-      introSec: intro && existsSync(intro) ? probeDurationSec(intro) : undefined,
-      outroSec: outro && existsSync(outro) ? probeDurationSec(outro) : undefined,
+      introSec: intro && existsSync(intro) ? probeDurationSec(intro) || undefined : undefined,
+      outroSec: outro && existsSync(outro) ? probeDurationSec(outro) || undefined : undefined,
       introCueSec: typeof cfg.intro_cue_sec === 'number' ? cfg.intro_cue_sec : null,
       fromScratch,
       notes,
     }
+  }
+
+  /** Absolute path of the rendered output for a target, if it exists. */
+  outputPath(sessionId: string, mode: EditorMode, reelId?: string): string | null {
+    const root = this.workDir(sessionId)
+    if (!root) return null
+    const p =
+      mode === 'reel'
+        ? join(root, 'out_final', `${reelId ?? ''}.mp4`)
+        : join(root, 'work', 'final.mp4')
+    return existsSync(p) ? p : null
   }
 
   private loadReel(sessionId: string, root: string, reelId: string): EditorProject | null {
