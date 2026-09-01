@@ -264,13 +264,20 @@ export function TimelineEditor({ sessionId, mode, reelId, onClose }: Props): JSX
                   onSeek={seek}
                 />
                 {mode === 'basic' ? (
-                  <CutsLane kept={kept} duration={duration} zoom={zoom} />
+                  <CutsLane
+                    kept={kept}
+                    onChange={setKept}
+                    duration={duration}
+                    zoom={zoom}
+                    onSeek={seek}
+                  />
                 ) : (
-                  <WindowLane window={win} duration={duration} zoom={zoom} />
+                  <WindowLane window={win} onChange={setWin} duration={duration} zoom={zoom} />
                 )}
                 <div className="tl-playhead" style={{ insetInlineStart: time * zoom }} />
               </div>
             </div>
+            <p className="hint tl-lane-hint">{t('editor.laneHint')}</p>
           </div>
 
           <aside className="tl-side">
@@ -520,45 +527,251 @@ function TranscriptLane({
   )
 }
 
+const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, v))
+const MIN_LEN = 0.05
+
+type DragKind = 'move' | 'l' | 'r'
+interface DragState {
+  kind: DragKind
+  index: number
+  startX: number
+  orig: EditorRange
+}
+interface Menu {
+  x: number
+  y: number
+  sec: number
+  index: number | null // green block index, or null for a red gap
+}
+
+/**
+ * Interactive cuts lane. Green blocks are the kept segments; the striped red is
+ * removed. Drag a block's body to move it, drag its edges to resize (to the
+ * millisecond), right-click a block to split/delete it, and right-click the red
+ * to restore that gap — the numeric list stays in sync.
+ */
 function CutsLane({
   kept,
+  onChange,
   duration,
   zoom,
+  onSeek,
 }: {
   kept: EditorRange[]
+  onChange: (next: EditorRange[]) => void
   duration: number
   zoom: number
+  onSeek: (s: number) => void
 }): JSX.Element {
+  const laneRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<DragState | null>(null)
+  const [menu, setMenu] = useState<Menu | null>(null)
+
+  const sorted = [...kept].sort((a, b) => a.start - b.start)
+  const secAt = (clientX: number): number => {
+    const rect = laneRef.current?.getBoundingClientRect()
+    if (!rect) return 0
+    return clamp((clientX - rect.left) / zoom, 0, duration)
+  }
+
+  const onPointerMove = useCallback(
+    (e: PointerEvent) => {
+      const d = dragRef.current
+      if (!d) return
+      const rect = laneRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const cursor = clamp((e.clientX - rect.left) / zoom, 0, duration)
+      const list = [...kept].sort((a, b) => a.start - b.start)
+      const prevEnd = d.index > 0 ? list[d.index - 1]!.end : 0
+      const nextStart = d.index < list.length - 1 ? list[d.index + 1]!.start : duration
+      const cur = list[d.index]!
+      let start = cur.start
+      let end = cur.end
+      if (d.kind === 'l') {
+        start = clamp(cursor, prevEnd, end - MIN_LEN)
+      } else if (d.kind === 'r') {
+        end = clamp(cursor, start + MIN_LEN, nextStart)
+      } else {
+        const len = d.orig.end - d.orig.start
+        const deltaSec = (e.clientX - d.startX) / zoom
+        start = clamp(d.orig.start + deltaSec, prevEnd, nextStart - len)
+        end = start + len
+      }
+      list[d.index] = { start, end }
+      onChange(list)
+    },
+    [kept, zoom, duration, onChange],
+  )
+
+  const endDrag = useCallback(() => {
+    dragRef.current = null
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', endDrag)
+  }, [onPointerMove])
+
+  const startDrag = (e: React.PointerEvent, kind: DragKind, index: number): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    const list = [...kept].sort((a, b) => a.start - b.start)
+    dragRef.current = { kind, index, startX: e.clientX, orig: { ...list[index]! } }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', endDrag)
+  }
+
+  useEffect(() => () => endDrag(), [endDrag])
+  useEffect(() => {
+    if (!menu) return
+    const close = (): void => setMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [menu])
+
+  // ── menu actions ─────────────────────────────────────────────────────────
+  const splitAt = (index: number, sec: number): void => {
+    const list = [...kept].sort((a, b) => a.start - b.start)
+    const b = list[index]!
+    if (sec <= b.start + MIN_LEN || sec >= b.end - MIN_LEN) return
+    list.splice(index, 1, { start: b.start, end: sec }, { start: sec, end: b.end })
+    onChange(list)
+  }
+  const deleteAt = (index: number): void => {
+    const list = [...kept].sort((a, b) => a.start - b.start)
+    list.splice(index, 1)
+    onChange(list)
+  }
+  const restoreGapAt = (sec: number): void => {
+    // Grow the kept set to cover the red gap the cursor is in.
+    const list = [...kept].sort((a, b) => a.start - b.start)
+    let gapStart = 0
+    let gapEnd = duration
+    for (const k of list) {
+      if (k.end <= sec) gapStart = k.end
+      if (k.start >= sec) {
+        gapEnd = k.start
+        break
+      }
+    }
+    if (gapEnd - gapStart < MIN_LEN) return
+    list.push({ start: gapStart, end: gapEnd })
+    list.sort((a, b) => a.start - b.start)
+    // Merge any now-touching ranges.
+    const merged: EditorRange[] = []
+    for (const k of list) {
+      const last = merged[merged.length - 1]
+      if (last && k.start <= last.end + 0.001) last.end = Math.max(last.end, k.end)
+      else merged.push({ ...k })
+    }
+    onChange(merged)
+  }
+
+  const openMenu = (e: React.MouseEvent, index: number | null): void => {
+    e.preventDefault()
+    e.stopPropagation()
+    setMenu({ x: e.clientX, y: e.clientY, sec: secAt(e.clientX), index })
+  }
+
   return (
-    <div className="tl-lane tl-lane--cuts" style={{ width: Math.max(1, duration * zoom) }}>
-      {kept.map((k, i) => (
+    <div
+      ref={laneRef}
+      className="tl-lane tl-lane--cuts"
+      style={{ width: Math.max(1, duration * zoom) }}
+      onContextMenu={(e) => openMenu(e, null)}
+      onDoubleClick={(e) => onSeek(secAt(e.clientX))}
+    >
+      {sorted.map((k, i) => (
         <div
           key={i}
-          className="tl-keep"
-          style={{ insetInlineStart: k.start * zoom, width: Math.max(2, (k.end - k.start) * zoom) }}
+          className="tl-keep tl-keep--edit"
+          style={{ insetInlineStart: k.start * zoom, width: Math.max(4, (k.end - k.start) * zoom) }}
           title={`${fmtMs(k.start)} → ${fmtMs(k.end)}`}
-        />
+          onPointerDown={(e) => e.button === 0 && startDrag(e, 'move', i)}
+          onContextMenu={(e) => openMenu(e, i)}
+        >
+          <span className="tl-keep__handle tl-keep__handle--l" onPointerDown={(e) => e.button === 0 && startDrag(e, 'l', i)} />
+          <span className="tl-keep__handle tl-keep__handle--r" onPointerDown={(e) => e.button === 0 && startDrag(e, 'r', i)} />
+        </div>
       ))}
+
+      {menu && (
+        <div className="tl-menu" style={{ left: menu.x, top: menu.y }} onClick={(e) => e.stopPropagation()}>
+          {menu.index !== null ? (
+            <>
+              <button onClick={() => { splitAt(menu.index!, menu.sec); setMenu(null) }}>
+                ✂ {t('editor.splitAtCursor')}
+              </button>
+              <button onClick={() => { deleteAt(menu.index!); setMenu(null) }}>
+                🗑 {t('editor.deleteSegment')}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => { restoreGapAt(menu.sec); setMenu(null) }}>
+              ↩ {t('editor.restoreGap')}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
+/** Reel window lane — one draggable/resizable block within the clip. */
 function WindowLane({
   window: win,
+  onChange,
   duration,
   zoom,
 }: {
   window: EditorRange
+  onChange: (w: EditorRange) => void
   duration: number
   zoom: number
 }): JSX.Element {
+  const laneRef = useRef<HTMLDivElement>(null)
+  const dragRef = useRef<{ kind: DragKind; startX: number; orig: EditorRange } | null>(null)
+
+  const onPointerMove = useCallback(
+    (e: PointerEvent) => {
+      const d = dragRef.current
+      const rect = laneRef.current?.getBoundingClientRect()
+      if (!d || !rect) return
+      const cursor = clamp((e.clientX - rect.left) / zoom, 0, duration)
+      if (d.kind === 'l') onChange({ start: clamp(cursor, 0, d.orig.end - MIN_LEN), end: d.orig.end })
+      else if (d.kind === 'r') onChange({ start: d.orig.start, end: clamp(cursor, d.orig.start + MIN_LEN, duration) })
+      else {
+        const len = d.orig.end - d.orig.start
+        const start = clamp(d.orig.start + (e.clientX - d.startX) / zoom, 0, duration - len)
+        onChange({ start, end: start + len })
+      }
+    },
+    [zoom, duration, onChange],
+  )
+  const endDrag = useCallback(() => {
+    dragRef.current = null
+    window.removeEventListener('pointermove', onPointerMove)
+    window.removeEventListener('pointerup', endDrag)
+  }, [onPointerMove])
+  useEffect(() => () => endDrag(), [endDrag])
+
+  const startDrag = (e: React.PointerEvent, kind: DragKind): void => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    dragRef.current = { kind, startX: e.clientX, orig: { ...win } }
+    window.addEventListener('pointermove', onPointerMove)
+    window.addEventListener('pointerup', endDrag)
+  }
+
   return (
-    <div className="tl-lane tl-lane--cuts" style={{ width: Math.max(1, duration * zoom) }}>
+    <div ref={laneRef} className="tl-lane tl-lane--cuts" style={{ width: Math.max(1, duration * zoom) }}>
       <div
-        className="tl-keep"
-        style={{ insetInlineStart: 0, width: Math.max(2, (win.end - win.start) * zoom) }}
+        className="tl-keep tl-keep--edit"
+        style={{ insetInlineStart: win.start * zoom, width: Math.max(4, (win.end - win.start) * zoom) }}
         title={`${fmtMs(win.start)} → ${fmtMs(win.end)}`}
-      />
+        onPointerDown={(e) => startDrag(e, 'move')}
+      >
+        <span className="tl-keep__handle tl-keep__handle--l" onPointerDown={(e) => startDrag(e, 'l')} />
+        <span className="tl-keep__handle tl-keep__handle--r" onPointerDown={(e) => startDrag(e, 'r')} />
+      </div>
     </div>
   )
 }
