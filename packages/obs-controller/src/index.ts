@@ -259,6 +259,74 @@ export class ObsController extends EventEmitter {
     return { mics: audioInputs, tracks: trackCount }
   }
 
+  /**
+   * Toggle the **Source Record** filter (obs-source-record plugin) on the active
+   * cameras — the sources currently enabled in the program scene that carry that
+   * filter, which is how each camera gets recorded as its own separate angle.
+   * Turns them all off if any is on, otherwise all on. Falls back to every source
+   * that has the filter when no active one does. Returns the new state + count.
+   */
+  async toggleSeparateAngles(): Promise<{ on: boolean; cameras: number }> {
+    const isSourceRecord = (kind: unknown): boolean =>
+      kind === 'source_record_filter' || String(kind).includes('source_record')
+
+    // 1) Active sources = enabled scene items in the current program scene.
+    const active = new Set<string>()
+    try {
+      const scene = (await this.obs.call('GetSceneList')).currentProgramSceneName
+      if (scene) {
+        const { sceneItems } = await this.obs.call('GetSceneItemList', { sceneName: scene })
+        for (const item of sceneItems) {
+          const it = item as { sceneItemEnabled?: boolean; sourceName?: string }
+          if (it.sceneItemEnabled !== false && it.sourceName) active.add(String(it.sourceName))
+        }
+      }
+    } catch {
+      // Can't resolve the active set — fall back to scanning every source below.
+    }
+
+    const found: { source: string; filter: string; enabled: boolean }[] = []
+    const scan = async (name: string): Promise<void> => {
+      try {
+        const { filters } = await this.obs.call('GetSourceFilterList', { sourceName: name })
+        for (const f of filters) {
+          const filter = f as { filterKind?: unknown; filterName?: string; filterEnabled?: boolean }
+          if (isSourceRecord(filter.filterKind)) {
+            found.push({ source: name, filter: String(filter.filterName), enabled: !!filter.filterEnabled })
+          }
+        }
+      } catch {
+        // Source can't carry filters — skip.
+      }
+    }
+
+    // 2) Look on the active sources first; if none carry the filter, scan all.
+    const primary = active.size ? [...active] : await this.allInputNames()
+    for (const name of primary) await scan(name)
+    if (found.length === 0 && active.size) {
+      for (const name of await this.allInputNames()) await scan(name)
+    }
+    if (found.length === 0) return { on: false, cameras: 0 }
+
+    // 3) Toggle: all off if any is on, else all on.
+    const next = !found.some((f) => f.enabled)
+    for (const f of found) {
+      await this.obs
+        .call('SetSourceFilterEnabled', {
+          sourceName: f.source,
+          filterName: f.filter,
+          filterEnabled: next,
+        })
+        .catch((err) => console.warn('[obs] SetSourceFilterEnabled failed:', err))
+    }
+    return { on: next, cameras: found.length }
+  }
+
+  private async allInputNames(): Promise<string[]> {
+    const { inputs } = await this.obs.call('GetInputList')
+    return inputs.map((i) => String(i.inputName))
+  }
+
   async listScenes(): Promise<{ scenes: ObsScene[]; current: string | null }> {
     const data = await this.obs.call('GetSceneList')
     const scenes = data.scenes

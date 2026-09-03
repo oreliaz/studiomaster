@@ -722,6 +722,7 @@ app.whenReady().then(() => {
     getState: () => ({ connection: obs.getConnectionState(), record: obs.getRecordState() }),
     toggleRecord: () => obs.toggleRecord(),
     addMarker: (category) => addMarker(category),
+    toggleSeparateAngles: () => obs.toggleSeparateAngles(),
     getLang: () => (store.getSetting(UI_LANG_KEY) === 'en' ? 'en' : 'he'),
   })
 

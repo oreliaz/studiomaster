@@ -17,6 +17,8 @@ export interface DockDeps {
   getState(): { connection: ObsConnectionState; record: ObsRecordState }
   toggleRecord(): Promise<ObsRecordState>
   addMarker(category: ReviewMarkerCategory): unknown
+  /** Toggle the Source Record filter on the active cameras (separate angles). */
+  toggleSeparateAngles(): Promise<{ on: boolean; cameras: number }>
   /** Current UI language, so the dock matches the rest of the app. */
   getLang?(): DockLang
 }
@@ -53,6 +55,19 @@ export function startDockServer(deps: DockDeps, port = DOCK_PORT): Server {
       res.end(JSON.stringify({ ok: !!marker }))
       return
     }
+    if (url.pathname === '/api/angles/toggle' && req.method === 'POST') {
+      void deps
+        .toggleSeparateAngles()
+        .then((r) => {
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify(r))
+        })
+        .catch(() => {
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify({ on: false, cameras: 0 }))
+        })
+      return
+    }
     res.statusCode = 404
     res.end('not found')
   })
@@ -81,6 +96,10 @@ interface DockStrings {
   chapter: string
   markCount: string
   introCount: string
+  angles: string
+  anglesOn: string
+  anglesOff: string
+  anglesNone: string
 }
 
 const STRINGS: Record<DockLang, DockStrings> = {
@@ -95,6 +114,10 @@ const STRINGS: Record<DockLang, DockStrings> = {
     chapter: 'פרק',
     markCount: 'סימונים בהקלטה: ',
     introCount: 'נקודות פתיח: ',
+    angles: '🎥 זוויות נפרדות',
+    anglesOn: 'זוויות נפרדות: פועל ({n})',
+    anglesOff: 'זוויות נפרדות: כבוי',
+    anglesNone: 'לא נמצא Source Record במצלמות',
   },
   en: {
     connected: 'Connected to OBS',
@@ -107,6 +130,10 @@ const STRINGS: Record<DockLang, DockStrings> = {
     chapter: 'Chapter',
     markCount: 'Markers this recording: ',
     introCount: 'Intro cues: ',
+    angles: '🎥 Separate angles',
+    anglesOn: 'Separate angles: on ({n})',
+    anglesOff: 'Separate angles: off',
+    anglesNone: 'No Source Record filter on cameras',
   },
 }
 
@@ -138,6 +165,11 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 .flash{animation:flash .5s}
 @keyframes flash{0%{background:#fff;color:#b91c1c}100%{}}
 .row{display:flex;gap:6px}.row button{background:#222833;font-size:13px;padding:10px}
+/* Separate-angles toggle (Source Record on the active cameras). */
+.angles{background:linear-gradient(180deg,#f59e0b,#b45309);font-weight:700;font-size:15px;
+  border-radius:12px;padding:14px 12px}
+.angles.on{background:linear-gradient(180deg,#22c55e,#15803d)}
+.angles:active{transform:translateY(1px)}
 .status{font-size:12px;color:#8b93a4;text-align:center;margin-bottom:6px}
 .count{font-size:12px;color:#8b93a4;text-align:center;margin-top:2px}
 </style></head><body>
@@ -150,6 +182,8 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 <button id="bhl" onclick="mark('highlight',this)"></button>
 <button id="bch" onclick="mark('chapter',this)"></button>
 </div>
+<button class="angles" id="angles" onclick="toggleAngles()"></button>
+<div class="count" id="anglesstatus"></div>
 <div class="count" id="count"></div>
 <div class="count" id="introcount"></div>
 <script>
@@ -159,6 +193,7 @@ document.querySelector('.mark-fix').textContent=L.markFix;
 document.querySelector('.mark-intro').textContent=L.markIntro;
 document.getElementById('bhl').textContent=L.highlight;
 document.getElementById('bch').textContent=L.chapter;
+document.getElementById('angles').textContent=L.angles;
 function p(n,l){return String(n).padStart(l,'0')}
 function fmt(ms){ms=Math.max(0,Math.floor(ms));return p(Math.floor(ms/3600000),2)+':'+p(Math.floor(ms%3600000/60000),2)+':'+p(Math.floor(ms%60000/1000),2)+'.'+p(Math.floor(ms%1000),3)}
 async function refresh(){try{const s=await (await fetch('/api/state')).json();
@@ -172,6 +207,12 @@ async function mark(c,b){if(b){b.classList.remove('flash');void b.offsetWidth;b.
 const res=await (await fetch('/api/marker?cat='+c,{method:'POST'})).json();
 if(res&&res.ok){if(c==='intro'){intros++;document.getElementById('introcount').textContent=L.introCount+intros;}
 else{marks++;document.getElementById('count').textContent=L.markCount+marks;}}}
+async function toggleAngles(){var b=document.getElementById('angles');b.disabled=true;
+try{const r=await (await fetch('/api/angles/toggle',{method:'POST'})).json();
+var st=document.getElementById('anglesstatus');
+if(!r||!r.cameras){b.className='angles';st.textContent=L.anglesNone;}
+else if(r.on){b.className='angles on';st.textContent=L.anglesOn.replace('{n}',r.cameras);}
+else{b.className='angles';st.textContent=L.anglesOff;}}catch(e){}b.disabled=false;}
 setInterval(refresh,1000);setInterval(tick,100);refresh();
 </script></body></html>`
 }
