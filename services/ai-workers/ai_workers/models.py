@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-MarkerCategory = Literal["fix", "highlight", "chapter", "note", "intro"]
+MarkerCategory = Literal["fix", "highlight", "chapter", "note", "intro", "outro"]
 
 
 @dataclass(frozen=True)
