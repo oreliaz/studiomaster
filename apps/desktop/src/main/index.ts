@@ -1,5 +1,5 @@
 import { basename, join } from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { app, dialog, shell, BrowserWindow, ipcMain, globalShortcut, protocol } from 'electron'
 import { ObsController } from '@studiomaster/obs-controller'
@@ -198,9 +198,40 @@ async function afterRecordingStopped(sessionId: string, capturePath?: string): P
       console.warn('[audio] track split failed:', err)
     }
   }
+  if (source) exportMarkers(sessionId, source)
   await cloud.recognizeSession(sessionId).catch(() => undefined)
   if (mode === 'now') {
     await runEdit(sessionId).catch((err) => console.error('[ai] run-now failed:', err))
+  }
+}
+
+/**
+ * Write the session's review markers next to the OBS capture as
+ * `<capture>.markers.json`, so the agentedit studio agent (and any other
+ * tool watching the recordings folder) gets them with the file itself.
+ */
+function exportMarkers(sessionId: string, capturePath: string): void {
+  const markers = store.listMarkers(sessionId).map((m) => ({ tcMs: m.tcMs, category: m.category, note: m.note }))
+  const target = capturePath.replace(/\.[^.\\/]+$/, '') + '.markers.json'
+  try {
+    writeFileSync(target, JSON.stringify({ sessionId, markers }, null, 2), 'utf8')
+  } catch (err) {
+    console.warn('[markers] export failed:', err)
+  }
+}
+
+/** URL of the agentedit studio agent on this machine (setting `agent.url`). */
+const AGENT_URL_KEY = 'agent.url'
+
+/** "סיימנו להיום" from the dock: ask the studio agent to send the day-end report now. */
+async function notifyDayEnd(): Promise<boolean> {
+  const base = store.getSetting(AGENT_URL_KEY) || 'http://127.0.0.1:3940'
+  try {
+    const res = await fetch(`${base}/day-end`, { method: 'POST' })
+    return res.ok
+  } catch (err) {
+    console.warn('[agent] day-end request failed:', err)
+    return false
   }
 }
 
@@ -622,6 +653,7 @@ function registerHotkeys(): void {
     'CommandOrControl+Shift+3': 'chapter',
     'CommandOrControl+Shift+4': 'note',
     'CommandOrControl+Shift+5': 'intro',
+    'CommandOrControl+Shift+6': 'outro',
   }
   for (const [accel, category] of Object.entries(map)) {
     const ok = globalShortcut.register(accel, () => addMarker(category))
@@ -721,7 +753,8 @@ app.whenReady().then(() => {
   startDockServer({
     getState: () => ({ connection: obs.getConnectionState(), record: obs.getRecordState() }),
     toggleRecord: () => obs.toggleRecord(),
-    addMarker: (category) => addMarker(category),
+    addMarker: (category, note) => addMarker(category, note),
+    dayEnd: () => notifyDayEnd(),
     toggleSeparateAngles: () => obs.toggleSeparateAngles(),
     getLang: () => (store.getSetting(UI_LANG_KEY) === 'en' ? 'en' : 'he'),
   })

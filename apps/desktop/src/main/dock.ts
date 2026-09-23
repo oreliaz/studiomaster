@@ -16,7 +16,9 @@ export type DockLang = 'he' | 'en'
 export interface DockDeps {
   getState(): { connection: ObsConnectionState; record: ObsRecordState }
   toggleRecord(): Promise<ObsRecordState>
-  addMarker(category: ReviewMarkerCategory): unknown
+  addMarker(category: ReviewMarkerCategory, note?: string): unknown
+  /** "סיימנו להיום": ask the agentedit studio agent to send the day-end report. */
+  dayEnd?(): Promise<boolean>
   /** Toggle the Source Record filter on the active cameras (separate angles). */
   toggleSeparateAngles(): Promise<{ on: boolean; cameras: number }>
   /** Current UI language, so the dock matches the rest of the app. */
@@ -50,9 +52,18 @@ export function startDockServer(deps: DockDeps, port = DOCK_PORT): Server {
     }
     if (url.pathname === '/api/marker' && req.method === 'POST') {
       const cat = (url.searchParams.get('cat') as ReviewMarkerCategory) || 'note'
-      const marker = deps.addMarker(cat)
+      const note = url.searchParams.get('note')?.trim().slice(0, 300) || undefined
+      const marker = deps.addMarker(cat, note)
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ ok: !!marker }))
+      return
+    }
+    if (url.pathname === '/api/day-end' && req.method === 'POST') {
+      const done = deps.dayEnd ? deps.dayEnd() : Promise.resolve(false)
+      void done.then((ok) => {
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ ok }))
+      })
       return
     }
     if (url.pathname === '/api/angles/toggle' && req.method === 'POST') {
@@ -92,6 +103,11 @@ interface DockStrings {
   stop: string
   markFix: string
   markIntro: string
+  markOutro: string
+  notePh: string
+  dayEnd: string
+  dayEndOk: string
+  dayEndFail: string
   highlight: string
   chapter: string
   markCount: string
@@ -110,6 +126,11 @@ const STRINGS: Record<DockLang, DockStrings> = {
     stop: '■ עצור הקלטה',
     markFix: '🔴 סמן טעות',
     markIntro: '🎬 כאן נכנס פתיח',
+    markOutro: '🏁 כאן נכנס סגיר',
+    notePh: 'הערה לסימון הבא (לא חובה)',
+    dayEnd: '✅ סיימנו להיום',
+    dayEndOk: 'נשלח סיכום יום למפיקה',
+    dayEndFail: 'סוכן האולפן לא זמין',
     highlight: 'הדגשה',
     chapter: 'פרק',
     markCount: 'סימונים בהקלטה: ',
@@ -126,6 +147,11 @@ const STRINGS: Record<DockLang, DockStrings> = {
     stop: '■ Stop recording',
     markFix: '🔴 Mark mistake',
     markIntro: '🎬 Intro goes here',
+    markOutro: '🏁 Outro goes here',
+    notePh: 'Note for the next marker (optional)',
+    dayEnd: '✅ Done for today',
+    dayEndOk: 'Day-end report sent to the producer',
+    dayEndFail: 'Studio agent unavailable',
     highlight: 'Highlight',
     chapter: 'Chapter',
     markCount: 'Markers this recording: ',
@@ -162,6 +188,12 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
   padding:18px 12px;border-radius:14px;box-shadow:0 4px 14px rgba(56,189,248,.4);
   letter-spacing:.5px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
 .mark-intro:active{transform:translateY(1px)}
+.mark-outro{background:linear-gradient(180deg,#a78bfa,#6d28d9);font-size:17px;font-weight:800;
+  padding:14px 12px;border-radius:14px}
+.note{width:100%;border:1px solid #262b36;border-radius:8px;background:#161a22;color:#e7ebf2;
+  padding:9px 10px;font:inherit;font-size:14px;margin:4px 0}
+.day-end{background:linear-gradient(180deg,#22c55e,#15803d);font-weight:800;font-size:16px;
+  border-radius:12px;padding:14px 12px;margin-top:10px}
 .flash{animation:flash .5s}
 @keyframes flash{0%{background:#fff;color:#b91c1c}100%{}}
 .row{display:flex;gap:6px}.row button{background:#222833;font-size:13px;padding:10px}
@@ -178,6 +210,8 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 <button class="rec" id="rec" onclick="toggle()"></button>
 <button class="mark-fix" onclick="mark('fix',this)"></button>
 <button class="mark-intro" onclick="mark('intro',this)"></button>
+<button class="mark-outro" onclick="mark('outro',this)"></button>
+<input class="note" id="note" maxlength="300"/>
 <div class="row">
 <button id="bhl" onclick="mark('highlight',this)"></button>
 <button id="bch" onclick="mark('chapter',this)"></button>
@@ -186,11 +220,16 @@ button{width:100%;border:none;border-radius:8px;padding:12px;font-size:15px;colo
 <div class="count" id="anglesstatus"></div>
 <div class="count" id="count"></div>
 <div class="count" id="introcount"></div>
+<button class="day-end" id="dayend" onclick="dayEnd()"></button>
+<div class="count" id="dayendstatus"></div>
 <script>
 var L=${L};
 var marks=0,intros=0,base=0,baseAt=0,active=false;
 document.querySelector('.mark-fix').textContent=L.markFix;
 document.querySelector('.mark-intro').textContent=L.markIntro;
+document.querySelector('.mark-outro').textContent=L.markOutro;
+document.getElementById('note').placeholder=L.notePh;
+document.getElementById('dayend').textContent=L.dayEnd;
 document.getElementById('bhl').textContent=L.highlight;
 document.getElementById('bch').textContent=L.chapter;
 document.getElementById('angles').textContent=L.angles;
@@ -204,9 +243,14 @@ document.getElementById('dot').className='dot'+(active?' live':'')}catch(e){}}
 function tick(){var ms=active?base+(performance.now()-baseAt):base;document.getElementById('tc').textContent=fmt(ms)}
 async function toggle(){await fetch('/api/record/toggle',{method:'POST'});setTimeout(refresh,200)}
 async function mark(c,b){if(b){b.classList.remove('flash');void b.offsetWidth;b.classList.add('flash');}
-const res=await (await fetch('/api/marker?cat='+c,{method:'POST'})).json();
-if(res&&res.ok){if(c==='intro'){intros++;document.getElementById('introcount').textContent=L.introCount+intros;}
+var n=document.getElementById('note');var q='/api/marker?cat='+c+(n.value.trim()?'&note='+encodeURIComponent(n.value.trim()):'');
+const res=await (await fetch(q,{method:'POST'})).json();
+if(res&&res.ok){n.value='';if(c==='intro'){intros++;document.getElementById('introcount').textContent=L.introCount+intros;}
 else{marks++;document.getElementById('count').textContent=L.markCount+marks;}}}
+async function dayEnd(){var b=document.getElementById('dayend');b.disabled=true;
+try{const r=await (await fetch('/api/day-end',{method:'POST'})).json();
+document.getElementById('dayendstatus').textContent=r&&r.ok?L.dayEndOk:L.dayEndFail;}catch(e){
+document.getElementById('dayendstatus').textContent=L.dayEndFail;}b.disabled=false;}
 async function toggleAngles(){var b=document.getElementById('angles');b.disabled=true;
 try{const r=await (await fetch('/api/angles/toggle',{method:'POST'})).json();
 var st=document.getElementById('anglesstatus');
