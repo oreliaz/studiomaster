@@ -14,7 +14,7 @@ import type {
   UploadProgress,
 } from './cloud.js'
 import type { AiJobResult, AiProgress } from './ai.js'
-import type { WizardState } from './wizard.js'
+import type { WizardPrefs, WizardState } from './wizard.js'
 import type { EditorMode, EditorProject, EditorSave, EditorTarget } from './editor.js'
 
 /**
@@ -68,6 +68,8 @@ export interface StudioMasterApi {
     setChecklistItem(index: number, done: boolean): Promise<WizardState>
     finishChecklist(): Promise<WizardState>
     reset(): Promise<WizardState>
+    getPrefs(): Promise<WizardPrefs>
+    setAutoStart(on: boolean): Promise<void>
   }
   mixer: {
     listInputs(): Promise<ObsInput[]>

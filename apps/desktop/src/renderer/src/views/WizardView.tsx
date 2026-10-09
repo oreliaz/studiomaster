@@ -11,6 +11,7 @@ import { t } from '../i18n.js'
 const PHASE_LABELS: Record<WizardPhase, string> = {
   idle: 'wizard.phaseIdle',
   launching: 'wizard.phaseLaunching',
+  connecting: 'wizard.phaseConnecting',
   lighting: 'wizard.phaseLighting',
   checklist: 'wizard.phaseChecklist',
   ready: 'wizard.phaseReady',
@@ -25,21 +26,42 @@ const STEP_ICON: Record<LaunchStep['status'], string> = {
   skipped: '—',
 }
 
-export function WizardView(): JSX.Element {
+/** StudioMaster's own components get a translated label; programs keep their name. */
+function stepLabel(step: LaunchStep): string {
+  if (step.kind === 'obs') return t('wizard.stepObs')
+  if (step.kind === 'lighting') return t('wizard.stepLighting')
+  return step.label
+}
+
+/**
+ * Home screen: one "start everything" button that opens the studio's
+ * programs, connects to OBS and sets the lighting, then walks the checklist.
+ */
+export function WizardView({ onGoRecord }: { onGoRecord(): void }): JSX.Element {
   const [profiles, setProfiles] = useState<StudioProfile[]>([])
   const [selectedId, setSelectedId] = useState<string>('')
   const [state, setState] = useState<WizardState>(initialWizardState)
   const [busy, setBusy] = useState(false)
+  const [autoStart, setAutoStart] = useState(false)
 
   useEffect(() => {
     void (async () => {
       const list = await window.studiomaster.profiles.list()
       setProfiles(list)
-      if (list[0]) setSelectedId((cur) => cur || list[0]!.id)
+      const prefs = await window.studiomaster.wizard.getPrefs()
+      setAutoStart(prefs.autoStart)
+      // Pre-select the studio that was started last.
+      const last = list.find((p) => p.id === prefs.profileId) ?? list[0]
+      if (last) setSelectedId((cur) => cur || last.id)
       setState(await window.studiomaster.wizard.getState())
     })()
     return window.studiomaster.onWizardState(setState)
   }, [])
+
+  const toggleAutoStart = async (on: boolean): Promise<void> => {
+    setAutoStart(on)
+    await window.studiomaster.wizard.setAutoStart(on)
+  }
 
   const running = state.phase !== 'idle' && state.phase !== 'ready' && state.phase !== 'failed'
 
@@ -97,7 +119,7 @@ export function WizardView(): JSX.Element {
             onClick={start}
             disabled={!selectedId || running || busy}
           >
-            {t('wizard.start')}
+            {state.phase === 'failed' ? t('wizard.retry') : t('wizard.start')}
           </button>
           {(state.phase === 'ready' || state.phase === 'failed') && (
             <button className="btn" onClick={reset}>
@@ -105,6 +127,15 @@ export function WizardView(): JSX.Element {
             </button>
           )}
         </div>
+        <p className="hint">{t('wizard.startHint')}</p>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={autoStart}
+            onChange={(e) => void toggleAutoStart(e.target.checked)}
+          />
+          {t('wizard.autoStart')}
+        </label>
       </section>
 
       {state.steps.length > 0 && (
@@ -117,10 +148,14 @@ export function WizardView(): JSX.Element {
                   {STEP_ICON[step.status]}
                 </span>
                 <span className="step__label">
-                  {step.label}
+                  {stepLabel(step)}
                   {step.required && <span className="step__req"> · {t('wizard.required')}</span>}
                 </span>
-                {step.detail && <span className="step__detail">{step.detail}</span>}
+                {step.alreadyRunning ? (
+                  <span className="step__detail">{t('wizard.alreadyRunning')}</span>
+                ) : (
+                  step.detail && <span className="step__detail">{step.detail}</span>
+                )}
               </li>
             ))}
           </ul>
@@ -156,6 +191,11 @@ export function WizardView(): JSX.Element {
         <section className="card card--success">
           <h2>{t('wizard.readyTitle')}</h2>
           <p className="hint">{t('wizard.readyHint')}</p>
+          <div className="actions">
+            <button className="btn btn--primary" onClick={onGoRecord}>
+              {t('wizard.goRecord')}
+            </button>
+          </div>
         </section>
       )}
 

@@ -33,6 +33,7 @@ venv/
 
 # logs / os
 *.log
+logs/
 .DS_Store
 Thumbs.db
 

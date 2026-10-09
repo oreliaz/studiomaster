@@ -8,6 +8,7 @@
     "apps/*"
   ],
   "scripts": {
+    "start": "node scripts/launch.mjs",
     "dev": "npm run dev --workspace @studiomaster/desktop",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

@@ -16,7 +16,7 @@
 | 3 | מתקין את סוכני העריכה + **מודל התמלול העברי** (ivrit.ai Whisper, ~1.6GB) |
 | 4 | בונה את האפליקציה |
 | 5 | **מפעיל את WebSocket ב-OBS** (4455, ללא סיסמה) ורושם את פאנל StudioMaster **בתוך OBS** |
-| 6 | יוצר קיצור דרך **StudioMaster** על שולחן העבודה |
+| 6 | יוצר קיצור דרך **StudioMaster** על שולחן העבודה (מפעיל את `StudioMaster.cmd` — בלי `npm run dev`) |
 
 ## אפשרויות
 ```powershell
@@ -31,7 +31,8 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
 - **סגור את OBS** לפני ההתקנה כדי שרישום ה-Dock יישמר (OBS דורס את ההגדרות ביציאה).
 - אם אין **winget** במחשב: התקן "App Installer" מ-Microsoft Store, או התקן ידנית את הכלים
   מטבלת השלב הראשון — שאר האשף ימשיך לעבוד.
-- אחרי ההתקנה: פשוט הפעל StudioMaster מהקיצור ולחץ **התחבר** — ה-WebSocket של OBS כבר דלוק
+- אחרי ההתקנה: פשוט הפעל StudioMaster מהקיצור ולחץ **▶ הפעל הכל** במסך הבית — הוא פותח את תוכנות
+  האולפן ומתחבר ל-OBS לבד (אפשר לסמן שזה ירוץ אוטומטית בכל פתיחה). ה-WebSocket של OBS כבר דלוק
   (4455, ללא סיסמה). בחיבור הראשון StudioMaster **יוצר אוטומטית** את מקור החיווי
   `StudioMaster Marker` בסצנה הנוכחית (מוסתר — אפשר לעצב/למקם אותו כרצונך).
 - מדריך העבודה המלא: [`../docs/PILOT.md`](../docs/PILOT.md).
@@ -42,7 +43,8 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -SkipPrereqs
 2. הקלד: `powershell -ExecutionPolicy Bypass -File .\install.ps1`
 
 ## אם Windows חוסם (SmartScreen / Smart App Control)
-Windows חוסם קבצים לא-חתומים. **הפעל מהקיצור** (dev mode, electron חתום) ולא מה-`.exe`.
+Windows חוסם קבצים לא-חתומים. **הפעל מהקיצור** (`StudioMaster.cmd`, electron חתום) ולא מה-`.exe`.
+**קיצור ישן** (מלפני העדכון, מריץ `npm run dev`)? דאבל-קליק על `Create-Desktop-Shortcut.cmd` פעם אחת.
 אם קובץ נחסם: ימני → **Properties → Unblock**. אם קופץ SmartScreen: **More info → Run anyway**.
 אם Smart App Control ב-Win11 חוסם — כבה אותו ב-Windows Security, או הישאר ב-dev mode.
 פרטים: [`../docs/PILOT.md`](../docs/PILOT.md#אבטחת-windows--smartscreen--smart-app-control).

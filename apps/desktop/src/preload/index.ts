@@ -62,6 +62,8 @@ const api: StudioMasterApi = {
       ipcRenderer.invoke('wizard:set-checklist-item', index, done),
     finishChecklist: () => ipcRenderer.invoke('wizard:finish-checklist'),
     reset: () => ipcRenderer.invoke('wizard:reset'),
+    getPrefs: () => ipcRenderer.invoke('wizard:get-prefs'),
+    setAutoStart: (on: boolean) => ipcRenderer.invoke('wizard:set-auto-start', on),
   },
   mixer: {
     listInputs: () => ipcRenderer.invoke('mixer:list-inputs'),

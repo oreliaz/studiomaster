@@ -34,6 +34,7 @@ npm install
 ### פיתוח
 ```bash
 npm run dev           # מריץ את האפליקציה עם hot-reload (electron-vite dev)
+npm start             # (משורש הריפו) הפעלה רגילה של ה-build — ראה docs/DEV.md
 ```
 
 ### בנייה ובדיקות

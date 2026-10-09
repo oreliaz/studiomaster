@@ -17,10 +17,21 @@ npm install
 > אם הורדת ה-binary של Electron נחסמת ברשת: `set ELECTRON_SKIP_BINARY_DOWNLOAD=1` (הרצה ידנית תוריד בהמשך).
 > אין תלות native — האחסון הוא קובץ JSON תחת userData, כך ש-`npm install` לא דורש כלי build.
 
+## הפעלה רגילה (בלי `npm run dev`)
+
+```bash
+npm start              # = node scripts/launch.mjs — אותו דבר שהקיצור / StudioMaster.cmd מריצים
+```
+
+`scripts/launch.mjs`: מריץ `npm install` רק אם `package-lock.json` השתנה מאז ההתקנה האחרונה, בונה
+מחדש רק אם קובץ מקור חדש מה-build ב-`apps/desktop/out`, מפעיל את האפליקציה הבנויה כתהליך נפרד
+ויוצא (חלון הקונסול נסגר). פלט ה-main process נכתב ל-`logs/studiomaster.log`. אם StudioMaster כבר
+פתוח — החלון הקיים פשוט קופץ קדימה (single instance).
+
 ## פיתוח
 
 ```bash
-npm run dev            # מריץ את אפליקציית הדסקטופ (electron-vite dev)
+npm run dev            # מריץ את אפליקציית הדסקטופ (electron-vite dev, hot-reload)
 ```
 
 ## בדיקות

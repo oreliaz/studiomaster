@@ -271,6 +271,7 @@ body {
 }
 .badge--connecting,
 .badge--phase-launching,
+.badge--phase-connecting,
 .badge--phase-lighting,
 .badge--phase-checklist {
   color: var(--warn);

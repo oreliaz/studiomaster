@@ -22,13 +22,16 @@ git clone <repo-url> studiomaster
 cd studiomaster
 git checkout claude/obs-studio-management-system-ql7jfj
 npm install
-npm run dev                                          # פותח את האפליקציה
+npm start                                            # פותח את האפליקציה (בלי npm run dev)
 ```
+מכאן והלאה: דאבל-קליק על **`StudioMaster.cmd`** (או על הקיצור שיוצר `Create-Desktop-Shortcut.cmd`)
+— פותח את האפליקציה, ובונה מחדש לבד רק אחרי עדכון. `npm run dev` נשאר לפיתוח בלבד.
 לגרסת `.exe` להתקנה רגילה: `npm run dist:win` → הקובץ ב-`apps/desktop/release/`.
 
 ### 2. חיבור ל-OBS (מוגדר אוטומטית ע"י האשף)
-אשף ההתקנה כבר הפעיל את שרת ה-WebSocket של OBS (פורט **4455**, ללא סיסמה). פשוט פתח את
-StudioMaster, עבור ללשונית **"הקלטה"** ולחץ **התחבר** (הכתובת מוגדרת, שדה הסיסמה נשאר ריק).
+אשף ההתקנה כבר הפעיל את שרת ה-WebSocket של OBS (פורט **4455**, ללא סיסמה). הכפתור **▶ הפעל הכל**
+במסך הבית מתחבר ל-OBS לבד (אפשר גם ידנית: לשונית **"הקלטה"** → **התחבר**; הכתובת מוגדרת, שדה
+הסיסמה נשאר ריק).
 *(אם הרצת OBS בפעם הראשונה רק אחרי ההתקנה — הרץ את האשף שוב, או הפעל ידנית:
 Tools → WebSocket Server Settings → Enable.)*
 
@@ -70,7 +73,10 @@ python scripts\setup_check.py     # מדווח מה מוכן
 של אותו פודקאסט מיושמים אוטומטית בסיום. שתי ההגדרות נשמרות וחוזרות — לא ממלאים שוב.
 
 ### 6. זרימת עבודה יומית
-1. לשונית **"פתיחת אולפן"** → בחר אולפן → **▶ התחל אולפן** (פותח תוכנות + תאורה + checklist).
+1. מסך הבית **"פתיחת אולפן"** → בחר אולפן → **▶ הפעל הכל** — פותח את כל התוכנות (מה שכבר פתוח
+   לא נפתח שוב), מחבר את StudioMaster ל-OBS, מכוון תאורה ומציג checklist. סמן **"הפעל הכל
+   אוטומטית בכל פתיחה של StudioMaster"** — ואז דאבל-קליק על הקיצור מעלה את כל האולפן בלי עוד לחיצות.
+   *(כל רכיב נוסף — סוכן האולפן, מיקסר, טלפרומפטר — מוסיפים לרשימת התוכנות של האולפן.)*
 2. עבור ל-**"הקלטה"** (או השתמש בפאנל בתוך OBS) → **● התחל הקלטה**.
 3. תוך כדי: לחץ **Ctrl+Shift+1** (תיקון) / **2** (הדגשה) / **3** (פרק) / **4** (הערה) /
    **5** (פתיח) / **6** (סגיר) —
@@ -131,7 +137,8 @@ python scripts\setup_check.py     # מדווח מה מוכן
 
 Same flow, in short:
 1. Install **OBS 28+, Node 20+, Python 3.11+, ffmpeg**.
-2. `git clone` → `npm install` → `npm run dev`.
+2. `git clone` → `npm install` → `npm start` (afterwards: double-click `StudioMaster.cmd` / the
+   desktop shortcut — no `npm run dev`; it rebuilds by itself after an update).
 3. OBS **Tools → WebSocket Server Settings** → Enable (port 4455). Connect in the **Record** tab.
 4. OBS **Docks → Custom Browser Docks** → `http://127.0.0.1:3939/dock` to embed the panel.
 5. Install skill deps once: `services/skills/podcast-reels-he/install.ps1` (downloads the
@@ -139,7 +146,9 @@ Same flow, in short:
 6. **Studios** tab → create a studio: programs+order, lighting, PTZ, and the
    **Deliverables questionnaire** (edit type, content language he/en, intro/outro, reels
    count + style simple/premium, social upload). Saved and reused.
-7. **Open Studio** → **Record** (or the in-OBS dock) → mark with **Ctrl+Shift+1..4** → stop.
+7. **Open Studio** → **▶ Start everything** (opens the studio's apps, connects OBS, sets lighting;
+   tick "start automatically" to do it on every launch) → **Record** (or the in-OBS dock) → mark
+   with **Ctrl+Shift+1..4** → stop.
 8. **Cloud & Edit** tab → pick when the auto-editor runs (now / manual / overnight
    00:00–08:00). Outputs land in the session folder and optionally upload to Drive.
 
@@ -147,7 +156,7 @@ Same flow, in short:
 
 Windows חוסם קבצים לא-חתומים (אין לנו עדיין תעודת code-signing). מה עושים:
 
-- **מומלץ:** הפעל את StudioMaster **מהקיצור** (`npm run dev`) — משתמש ב-electron.exe החתום,
+- **מומלץ:** הפעל את StudioMaster **מהקיצור** (`StudioMaster.cmd`) — משתמש ב-electron.exe החתום,
   ולא נחסם. **אל** תריץ את ה-`.exe` הבנוי בפיילוט (הוא לא חתום → נחסם).
 - אם קובץ `.cmd`/`.ps1` נחסם: לחיצה ימנית → **Properties → Unblock → Apply**.
 - אם קופץ **SmartScreen** ("Windows protected your PC"): **More info → Run anyway**.

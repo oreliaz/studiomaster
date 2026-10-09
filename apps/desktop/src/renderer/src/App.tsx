@@ -46,7 +46,7 @@ export function App(): JSX.Element {
         </button>
       </nav>
       <main className="main">
-        {view === 'wizard' && <WizardView />}
+        {view === 'wizard' && <WizardView onGoRecord={() => setView('dashboard')} />}
         {view === 'dashboard' && <DashboardView />}
         {view === 'live' && <LiveView />}
         {view === 'cloud' && <CloudView />}

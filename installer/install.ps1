@@ -132,9 +132,8 @@ function Add-ObsDock([string]$ini) {
 }
 
 function New-Shortcut {
-  $launcher = Join-Path $RepoRoot 'Start-StudioMaster.cmd'
-  $body = "@echo off`r`ncd /d `"$RepoRoot`"`r`ncall npm run dev`r`n"
-  Set-Content -LiteralPath $launcher -Value $body -Encoding ASCII
+  # StudioMaster.cmd opens the built app (rebuilding after updates) - no npm run dev.
+  $launcher = Join-Path $RepoRoot 'StudioMaster.cmd'
   $desktop = [System.Environment]::GetFolderPath('Desktop')
   $lnk = Join-Path $desktop 'StudioMaster.lnk'
   $ws = New-Object -ComObject WScript.Shell
@@ -197,7 +196,7 @@ try {
     Write-Ok "installer .exe created under apps\desktop\release"
   } else {
     cmd /c "npm run build" | Write-Host
-    Write-Ok "app built (launch via the shortcut / npm run dev)"
+    Write-Ok "app built (launch via the desktop shortcut / StudioMaster.cmd)"
   }
 } finally { Pop-Location }
 

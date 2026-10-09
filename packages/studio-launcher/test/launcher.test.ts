@@ -117,3 +117,28 @@ test('readiness times out and marks the step failed', async () => {
   })
   assert.equal(result.steps[0]?.status, 'failed')
 })
+
+test('a program whose port already answers is not opened again', async () => {
+  const { effects, spawned } = makeEffects({ isPortOpen: async () => true })
+  const launcher = new StudioLauncher(effects)
+  const result = await launcher.launch(
+    [program('OBS', { waitFor: 'websocket' }), program('FreeStyler', { waitFor: 'port:3332' })],
+    () => {},
+  )
+  assert.equal(result.ok, true)
+  assert.deepEqual(spawned, [])
+  assert.deepEqual(
+    result.steps.map((s) => [s.status, s.alreadyRunning]),
+    [
+      ['ok', true],
+      ['ok', true],
+    ],
+  )
+})
+
+test('spawn-only programs are always opened (no reliable "already running" check)', async () => {
+  const { effects, spawned } = makeEffects({ isPortOpen: async () => true })
+  const launcher = new StudioLauncher(effects)
+  await launcher.launch([program('Teleprompter', { waitFor: 'window:Prompter' })], () => {})
+  assert.deepEqual(spawned, ['Teleprompter'])
+})

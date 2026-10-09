@@ -91,6 +91,11 @@ export class StudioLauncher {
       if (!program) continue
       update(i, { status: 'running' })
       try {
+        // Pressing "start" again (or after a crash) must not open a second OBS.
+        if (await this.isAlreadyUp(program)) {
+          update(i, { status: 'ok', alreadyRunning: true })
+          continue
+        }
         await this.effects.spawn(program)
         await this.waitForReady(program, opts)
         update(i, { status: 'ok' })
@@ -107,6 +112,18 @@ export class StudioLauncher {
 
     const ok = steps.every((s) => s.status === 'ok' || s.status === 'skipped' || !s.required)
     return { ok, steps }
+  }
+
+  /**
+   * True when the program's readiness port already answers, i.e. it is already
+   * open. Only port-based checks are trusted for this — a process-name match is
+   * too loose to skip a launch on.
+   */
+  private async isAlreadyUp(program: Program): Promise<boolean> {
+    const spec = parseWaitFor(program.waitFor)
+    if (spec.kind === 'websocket') return this.effects.isPortOpen('127.0.0.1', 4455)
+    if (spec.kind === 'port') return this.effects.isPortOpen('127.0.0.1', spec.port)
+    return false
   }
 
   private async waitForReady(program: Program, opts: Required<LaunchOptions>): Promise<void> {

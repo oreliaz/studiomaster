@@ -47,6 +47,17 @@ const ACTIVE_PODCAST_KEY = 'active.podcast'
 const RUN_MODE_KEY = 'run.mode'
 const AUTO_UPLOAD_KEY = 'upload.autoAfterEdit'
 const UI_LANG_KEY = 'ui.lang'
+const AUTO_START_KEY = 'wizard.autoStart'
+
+const DEFAULT_OBS_URL = 'ws://127.0.0.1:4455'
+/** How long "start everything" waits for a just-opened OBS to accept connections. */
+const OBS_START_TIMEOUT_MS = 60_000
+const OBS_START_RETRY_MS = 2000
+
+/** "Start everything" automatically whenever StudioMaster opens (default off). */
+function autoStartEnabled(): boolean {
+  return store.getSetting(AUTO_START_KEY) === 'true'
+}
 
 /** Auto-upload to Drive after an edit finishes (default on; no-op if not connected). */
 function autoUploadEnabled(): boolean {
@@ -78,7 +89,10 @@ function sessionRunMode(podcastId?: string): RunMode {
 const store = createStore()
 const obs = new ObsController()
 const session = new RecordingSessionManager(store)
-const wizard = new WizardOrchestrator((state: WizardState) => broadcast(IPC_EVENTS.wizard, state))
+const wizard = new WizardOrchestrator({
+  emit: (state: WizardState) => broadcast(IPC_EVENTS.wizard, state),
+  connectObs: () => connectObsForStart(),
+})
 const cloud = new CloudService(store, (p: UploadProgress) =>
   broadcast(IPC_EVENTS.uploadProgress, p),
 )
@@ -134,6 +148,29 @@ function migratePodcasts(): void {
     firstId = fallback.id
   }
   if (!store.getSetting(ACTIVE_PODCAST_KEY)) store.setSetting(ACTIVE_PODCAST_KEY, firstId)
+}
+
+/**
+ * Connect to OBS as part of "start everything": use the saved connection (or
+ * the installer's default, 4455 without a password) and keep retrying while a
+ * just-opened OBS finishes loading.
+ */
+async function connectObsForStart(): Promise<string | undefined> {
+  const params = store.getSavedConnection() ?? { url: DEFAULT_OBS_URL, password: '' }
+  const deadline = Date.now() + OBS_START_TIMEOUT_MS
+  for (;;) {
+    const current = obs.getConnectionState()
+    const state = current.status === 'connected' ? current : await obs.connect(params)
+    if (state.status === 'connected') {
+      store.saveConnection(params)
+      return state.obsVersion ? `obs-websocket ${state.obsVersion}` : undefined
+    }
+    // A wrong password won't fix itself by waiting.
+    if (/auth/i.test(state.error ?? '') || Date.now() >= deadline) {
+      throw new Error(state.error || 'OBS did not respond')
+    }
+    await new Promise((resolve) => setTimeout(resolve, OBS_START_RETRY_MS))
+  }
 }
 
 /** Rebuild the PTZ controller lazily when the active profile changes. */
@@ -434,6 +471,13 @@ function registerIpc(): void {
   )
   ipcMain.handle('wizard:finish-checklist', () => wizard.finishChecklist())
   ipcMain.handle('wizard:reset', () => wizard.reset())
+  ipcMain.handle('wizard:get-prefs', () => ({
+    autoStart: autoStartEnabled(),
+    profileId: store.getSetting(ACTIVE_PROFILE_KEY) || null,
+  }))
+  ipcMain.handle('wizard:set-auto-start', (_e, on: boolean) =>
+    store.setSetting(AUTO_START_KEY, on ? 'true' : 'false'),
+  )
 
   // Mixer
   ipcMain.handle('mixer:list-inputs', () => obs.listInputs())
@@ -758,6 +802,13 @@ app.whenReady().then(() => {
     toggleSeparateAngles: () => obs.toggleSeparateAngles(),
     getLang: () => (store.getSetting(UI_LANG_KEY) === 'en' ? 'en' : 'he'),
   })
+
+  // "Start everything" on open, if the user turned it on from the home screen:
+  // the studio started last gets its programs, OBS connection and lighting.
+  if (autoStartEnabled()) {
+    const profile = activeProfile()
+    if (profile) void wizard.start(profile)
+  }
 
   // Nightly editor scheduler — checks every 5 minutes (docs §6.4, transcript).
   setInterval(() => void nightlyTick(), 5 * 60 * 1000)
